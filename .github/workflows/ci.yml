@@ -1,0 +1,93 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Rust (stable)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          components: clippy, rustfmt
+
+      - uses: actions/checkout@v2
+
+      - name: Cache cargo registry and index
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-stable-cargo-files-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-stable-cargo-files-
+      - name: Cache cargo build debug
+        uses: actions/cache@v2
+        with:
+          path: target/debug
+          key: ${{ runner.os }}-stable-cargo-build-target-debug-qa-${{ hashFiles('Cargo.toml') }}-${{ hashFiles('*/src/**') }}
+          restore-keys: |
+            ${{ runner.os }}-stable-cargo-build-target-debug-
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
+
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        toolchain: [stable, nightly, '1.53']
+        features:
+          - ''
+          - '--no-default-features'
+
+    steps:
+      - name: Install Rust (${{ matrix.toolchain }})
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          default: true
+          components: clippy, rustfmt
+
+      - uses: actions/checkout@v2
+
+      - name: Cache cargo registry and index
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ matrix.toolchain }}-cargo-files-[${{ matrix.features }}]-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.toolchain }}-cargo-files-[${{ matrix.features }}]-
+            ${{ runner.os }}-${{ matrix.toolchain }}-cargo-files-
+            ${{ runner.os }}-stable-cargo-files-
+      - name: Cache cargo build debug
+        uses: actions/cache@v2
+        with:
+          path: target/debug
+          key: ${{ runner.os }}-${{ matrix.toolchain }}-cargo-build-target-debug-test-[${{ matrix.features }}]-${{ hashFiles('Cargo.toml') }}-${{ hashFiles('*/src/**') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.toolchain }}-cargo-build-target-debug-[${{ matrix.features }}]-
+            ${{ runner.os }}-${{ matrix.toolchain }}-cargo-build-target-debug-
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: ${{ matrix.features }}

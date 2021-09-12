@@ -1,0 +1,29 @@
+[package]
+name = "sgmlish"
+version = "0.1.0"
+description = "Simple parsing and deserialization of SGML"
+license = "MIT"
+repository = "https://github.com/mernen/sgmlish"
+authors = ["Daniel Luz <dev.gsz@mernen.com>"]
+categories = ["parser-implementations"]
+keywords = ["sgml", "serde"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["deserialize"]
+deserialize = ["serde"]
+
+[dependencies]
+log = "0.4.14"
+never = { version = "0.1.0", default-features = false }
+nom = "7.0"
+serde = { version = "1", optional = true }
+thiserror = "1.0.26"
+
+[dev-dependencies]
+rust_decimal = { version = "1.15", features = ["serde-str"] }
+serde = { version = "1", features = ["derive"] }
+serde_test = "1.0.126"
+simple_logger = "1.13.0"
