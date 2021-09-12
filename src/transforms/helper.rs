@@ -104,7 +104,7 @@ impl<'a> Transform<'a> {
         self.insertions.push((index, event));
     }
 
-    /// Applies the recorded changes to the given event list.
+    /// Applies the recorded changes to the given fragment.
     pub fn apply(self, fragment: SgmlFragment<'a>) -> SgmlFragment<'a> {
         if self.is_empty() {
             return fragment;

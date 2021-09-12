@@ -21,18 +21,18 @@ pub struct SgmlFragment<'a> {
 
 impl<'a> SgmlFragment<'a> {
     /// Returns the number of events in the list.
-    // `is_empty()` makes no sense here, since we don't expect empty event lists
+    // `is_empty()` makes no sense here, since we don't expect empty fragments
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.events.len()
     }
 
-    /// Views the event list as a slice of events.
+    /// Views the fragment as a slice of events.
     pub fn as_slice(&self) -> &[SgmlEvent<'a>] {
         &self.events
     }
 
-    /// Converts the event list into a [`Vec`] of events.
+    /// Converts the fragment into a [`Vec`] of events.
     pub fn into_vec(self) -> Vec<SgmlEvent<'a>> {
         self.events
     }
@@ -47,7 +47,7 @@ impl<'a> SgmlFragment<'a> {
         self.events.iter_mut()
     }
 
-    /// Detaches the event list from the source string, taking ownership of all substrings.
+    /// Detaches the fragment from the source string, taking ownership of all substrings.
     pub fn into_owned(self) -> SgmlFragment<'static> {
         self.into_iter()
             .map(|event| event.into_owned())
