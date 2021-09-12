@@ -1,6 +1,10 @@
 `sgmlish`
 =========
 
+[![Build status]](https://github.com/mernen/sgmlish/actions/workflows/ci.yml)
+[![Version badge]](https://crates.io/crates/sgmlish)
+[![Docs badge]](https://docs.rs/sgmlish)
+
 This is a library for handling SGML. It's not intended to be a full-featured
 implementation of the SGML spec; rather, it's meant to successfully parse
 common SGML uses, and then apply a number of normalization passes to make it
@@ -194,3 +198,7 @@ let example = sgmlish::from_fragment::<Crate>(sgml)?;
 [`lowercase_identifiers`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.lowercase_identifiers
 [`normalize_end_tags`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.normalize_end_tags
 [`trim_spaces`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.trim_spaces
+
+[Build status]: https://github.com/mernen/sgmlish/actions/workflows/ci.yml/badge.svg
+[Version badge]: https://img.shields.io/crates/v/sgmlish.svg
+[Docs badge]: https://img.shields.io/docsrs/sgmlish
