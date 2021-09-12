@@ -127,8 +127,8 @@ impl<'a> Data<'a> {
     ///     "&#60;Sonic &#38;amp; Knuckles&#62;"
     /// );
     /// ```
-    pub fn escape(&self) -> EscapeData {
-        EscapeData {
+    pub fn escape(&self) -> Escape {
+        Escape {
             escape_ampersand: self.verbatim(),
             chars: self.as_str().chars(),
             escape_buffer: None,
@@ -218,13 +218,13 @@ impl Default for Data<'_> {
 
 /// The return type of [`Data::escape`].
 #[derive(Clone, Debug)]
-pub struct EscapeData<'a> {
+pub struct Escape<'a> {
     escape_ampersand: bool,
     chars: std::str::Chars<'a>,
     escape_buffer: Option<std::slice::Iter<'static, u8>>,
 }
 
-impl<'a> Iterator for EscapeData<'a> {
+impl<'a> Iterator for Escape<'a> {
     type Item = char;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -269,7 +269,7 @@ impl<'a> Iterator for EscapeData<'a> {
     }
 }
 
-impl<'a> fmt::Display for EscapeData<'a> {
+impl<'a> fmt::Display for Escape<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.clone().try_for_each(|c| f.write_char(c))
     }
