@@ -9,6 +9,12 @@ categories = ["parser-implementations"]
 keywords = ["sgml", "serde"]
 edition = "2018"
 
+exclude = [
+    ".github/*",
+    ".editorconfig",
+    ".gitignore"
+]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
@@ -19,11 +25,10 @@ deserialize = ["serde"]
 log = "0.4.14"
 never = { version = "0.1.0", default-features = false }
 nom = "7.0"
-serde = { version = "1", optional = true }
-thiserror = "1.0.26"
+serde = { version = "1.0", optional = true }
+thiserror = "1.0"
 
 [dev-dependencies]
 rust_decimal = { version = "1.15", features = ["serde-str"] }
 serde = { version = "1", features = ["derive"] }
-serde_test = "1.0.126"
 simple_logger = "1.13.0"
