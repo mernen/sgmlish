@@ -14,7 +14,7 @@ use std::borrow::Cow;
 use std::fmt::{self, Write};
 
 pub use data::*;
-pub use error::Error;
+pub use error::{Error, Result};
 pub use event_list::*;
 pub use parser::{parse, ParseError};
 use util::make_owned;

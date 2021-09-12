@@ -178,7 +178,8 @@ let example = sgmlish::from_fragment::<Crate>(sgml)?;
 
 ## Crate features
 
-* `deserialize` --- includes support for [Serde] deserialization.
+* `deserialize` — includes support for [Serde] deserialization.
+
   Since this is the main use case for this library, this feature is enabled by default.
 
 

@@ -39,10 +39,9 @@ where
     Ok(SgmlFragment::from(events))
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub struct ParseError<I, E> {
     input: I,
-    #[source]
     error: E,
 }
 
