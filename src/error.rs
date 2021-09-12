@@ -9,7 +9,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[error("{0}")]
     ParseError(String),
-    #[cfg(feature = "deserialize")]
+    #[cfg(feature = "serde")]
     #[error(transparent)]
     DeserializationError(#[from] crate::de::DeserializationError),
     #[error(transparent)]

@@ -1,4 +1,5 @@
-#![cfg(feature = "deserialize")]
+#![cfg(feature = "serde")]
+
 use std::str::FromStr;
 
 use rust_decimal::Decimal;

@@ -55,10 +55,10 @@ impl<'a> SgmlFragment<'a> {
             .into()
     }
 
-    /// Deserializes using [`serde`]. This method requires the `deserialize` feature.
+    /// Deserializes using [`serde`]. This method requires the `serde` feature.
     ///
     /// This is a convenience method for [`from_fragment`](crate::de::from_fragment).
-    #[cfg(feature = "deserialize")]
+    #[cfg(feature = "serde")]
     pub fn deserialize<T>(self) -> Result<T, crate::de::DeserializationError>
     where
         T: serde::Deserialize<'a>,

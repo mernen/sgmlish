@@ -19,10 +19,10 @@ pub use event_list::*;
 pub use parser::{parse, ParseError};
 use util::make_owned;
 
-#[cfg(feature = "deserialize")]
+#[cfg(feature = "serde")]
 pub mod de;
 
-#[cfg(feature = "deserialize")]
+#[cfg(feature = "serde")]
 pub use de::from_fragment;
 
 /// Represents a relevant occurrence in an SGML document.

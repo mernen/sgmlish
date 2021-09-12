@@ -182,9 +182,10 @@ let example = sgmlish::from_fragment::<Crate>(sgml)?;
 
 ## Crate features
 
-* `deserialize` — includes support for [Serde] deserialization.
+* `serde` — includes support for [Serde] deserialization.
 
   Since this is the main use case for this library, this feature is enabled by default.
+  To disable it, set `default-features = false` in your `Cargo.toml` file.
 
 
 [HTML5 spec]: https://html.spec.whatwg.org/multipage/parsing.html#parsing

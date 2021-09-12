@@ -50,7 +50,7 @@ impl<'a> Data<'a> {
         }
     }
 
-    #[cfg_attr(feature = "deserialize", allow(unused))]
+    #[cfg_attr(feature = "serde", allow(unused))]
     pub(crate) fn into_cow(self) -> Cow<'a, str> {
         match self {
             CData(s) => s,
