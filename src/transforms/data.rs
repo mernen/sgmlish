@@ -4,7 +4,7 @@ use never::Never;
 
 use crate::{Data, SgmlEvent, SgmlFragment};
 
-use super::{extract_data_marked_section, Transform};
+use super::Transform;
 
 /// The action to be taken on the event being processed.
 /// Used as a return value for closures passed to [`SgmlFragment::map_data`].
@@ -79,12 +79,6 @@ where
             SgmlEvent::Attribute(key, Some(value)) => f(value, Some(&key))
                 .into()
                 .map(|value| SgmlEvent::Attribute(key, Some(value)))?,
-            SgmlEvent::MarkedSection(status_keywords, content) => {
-                match extract_data_marked_section(&status_keywords, content) {
-                    Ok(data) => f(data, None).into().map(SgmlEvent::Character)?,
-                    Err(content) => Some(SgmlEvent::MarkedSection(status_keywords, content)),
-                }
-            }
             event => Some(event),
         };
         match result {
@@ -106,10 +100,6 @@ mod tests {
             SgmlEvent::Attribute("X".into(), Some(Data::RcData("value".into()))),
             SgmlEvent::Character(Data::RcData("rcdata".into())),
             SgmlEvent::Character(Data::CData("cdata".into())),
-            SgmlEvent::MarkedSection("CDATA".into(), " marked cdata ".into()),
-            SgmlEvent::MarkedSection("RCDATA".into(), " marked rcdata ".into()),
-            // This one should not be passed
-            SgmlEvent::MarkedSection("CDATA TEMP".into(), " marked cdata temp ".into()),
         ]);
 
         let result = try_map_data(fragment, |data, attr| {
@@ -118,7 +108,7 @@ mod tests {
         .unwrap()
         .into_vec();
 
-        assert_eq!(result.len(), 6);
+        assert_eq!(result.len(), 3);
         assert_eq!(
             result[0],
             SgmlEvent::Attribute(
@@ -133,18 +123,6 @@ mod tests {
         assert_eq!(
             result[2],
             SgmlEvent::Character(Data::CData(r##"None=CData("cdata")"##.into()))
-        );
-        assert_eq!(
-            result[3],
-            SgmlEvent::Character(Data::CData(r##"None=CData(" marked cdata ")"##.into()))
-        );
-        assert_eq!(
-            result[4],
-            SgmlEvent::Character(Data::CData(r##"None=RcData(" marked rcdata ")"##.into()))
-        );
-        assert_eq!(
-            result[5],
-            SgmlEvent::MarkedSection("CDATA TEMP".into(), " marked cdata temp ".into())
         );
     }
 }

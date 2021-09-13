@@ -9,7 +9,6 @@ use serde::Deserializer;
 
 use crate::de::buffer::CowBuffer;
 use crate::entities::EntityError;
-use crate::transforms;
 use crate::{SgmlEvent, SgmlFragment};
 
 mod buffer;
@@ -41,7 +40,7 @@ mod buffer;
 ///     selected: bool,
 /// }
 ///
-/// # fn main() -> Result<(), sgmlish::Error> {
+/// # fn main() -> sgmlish::Result<()> {
 /// let sgml = r##"
 ///     <SELECT NAME="color">
 ///         <OPTION VALUE="">Choose one</OPTION>
@@ -203,27 +202,8 @@ impl<'de> SgmlDeserializer<'de> {
             None => return Ok(()),
         };
         match event {
-            SgmlEvent::Character(data) => {
-                let expanded = mem::take(data).expand_character_references()?;
-                *data = expanded;
-                Ok(())
-            }
-            SgmlEvent::Attribute(_key, Some(value)) => {
-                let expanded = mem::take(value).expand_character_references()?;
-                *value = expanded;
-                Ok(())
-            }
             SgmlEvent::MarkupDeclaration(_) | SgmlEvent::ProcessingInstruction(_) => self.advance(),
-            SgmlEvent::MarkedSection(status_keywords, content) => {
-                if let Ok(data) =
-                    transforms::extract_data_marked_section(status_keywords, mem::take(content))
-                {
-                    *event = SgmlEvent::Character(data.expand_character_references()?);
-                    Ok(())
-                } else {
-                    Err(DeserializationError::UnexpectedMarkedSection)
-                }
-            }
+            SgmlEvent::MarkedSection(..) => Err(DeserializationError::UnexpectedMarkedSection),
             SgmlEvent::OpenStartTag(name) | SgmlEvent::EndTag(name) if name.is_empty() => {
                 Err(DeserializationError::UnsupportedTag {
                     tag: event.clone().into_owned(),

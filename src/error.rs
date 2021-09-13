@@ -23,8 +23,9 @@ pub enum Error {
     /// An error occurred when decoding an entity reference.
     #[error(transparent)]
     EntityError(#[from] crate::entities::EntityError),
+    /// An error ocurred when processing a marked section.
     #[error("unrecognized marked section keyword: {0}")]
-    UnrecognizedMarkedSectionKeyword(String),
+    InvalidMarkedSectionKeyword(String),
 }
 
 impl<I: std::ops::Deref<Target = str>, E> From<ParseError<I, E>> for Error

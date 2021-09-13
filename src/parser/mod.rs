@@ -5,6 +5,9 @@ use nom::Finish;
 
 use crate::SgmlFragment;
 
+pub use self::config::*;
+
+mod config;
 pub mod events;
 pub mod raw;
 pub mod util;
@@ -17,19 +20,30 @@ pub(crate) type DefaultErrorType<I> = nom::error::VerboseError<I>;
 ///
 /// [`from_fragment`]: crate::from_fragment
 pub fn parse(input: &str) -> Result<SgmlFragment, ParseError<&str, DefaultErrorType<&str>>> {
-    parse_with_error_type(input)
+    parse_with(input, &Default::default())
 }
 
-/// Parses the given string with a custom error type.
+/// Parses the given string with a custom parser configuration and error type.
 ///
 /// Different error types can make different tradeoffs between performance and level of detail.
-pub fn parse_with_error_type<'a, E>(
+pub fn parse_with<'a>(
     input: &'a str,
+    config: &ParserConfig,
+) -> Result<SgmlFragment<'a>, ParseError<&'a str, DefaultErrorType<&'a str>>> {
+    parse_with_error(input, config)
+}
+
+pub fn parse_with_error<'a, E>(
+    input: &'a str,
+    config: &ParserConfig,
 ) -> Result<SgmlFragment<'a>, ParseError<&'a str, E>>
 where
-    E: nom::error::ParseError<&'a str> + nom::error::ContextError<&'a str> + fmt::Display,
+    E: nom::error::ParseError<&'a str>
+        + nom::error::ContextError<&'a str>
+        + nom::error::FromExternalError<&'a str, crate::Error>
+        + fmt::Display,
 {
-    let (rest, events) = events::document_entity::<E>(input)
+    let (rest, events) = events::document_entity::<E>(input, config)
         .finish()
         .map_err(|error| ParseError::from_nom(input, error))?;
     debug_assert!(rest.is_empty(), "document_entity should be all_consuming");

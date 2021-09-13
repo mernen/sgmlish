@@ -6,6 +6,7 @@ mod data;
 pub mod entities;
 pub mod error;
 mod fragment;
+pub mod marked_sections;
 pub mod parser;
 pub mod transforms;
 mod util;
@@ -16,7 +17,7 @@ use std::fmt::{self, Write};
 pub use data::*;
 pub use error::{Error, Result};
 pub use fragment::*;
-pub use parser::{parse, ParseError};
+pub use parser::{parse, parse_with, ParseError, ParserConfig};
 use util::make_owned;
 
 #[cfg(feature = "serde")]

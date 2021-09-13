@@ -3,10 +3,10 @@
 //! This is mainly based on <https://www.w3.org/MarkUp/SGML/productions.html>.
 
 use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag, take_until, take_while};
+use nom::bytes::complete::{is_not, tag};
 use nom::character::complete::{char, none_of, one_of, satisfy};
-use nom::combinator::{cut, map, not, opt, peek, recognize, verify};
-use nom::error::{context, ContextError, ParseError};
+use nom::combinator::{cut, map, map_parser, not, opt, peek, recognize, verify};
+use nom::error::{context, ContextError, ErrorKind, ParseError};
 use nom::multi::many0_count;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
@@ -62,6 +62,7 @@ where
     )(input)
 }
 
+#[deprecated]
 pub fn marked_section<'a, E>(input: &'a str) -> IResult<&str, (&str, &str), E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -81,6 +82,71 @@ where
             ))),
         ),
     )(input)
+}
+
+pub fn marked_section_start<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+where
+    E: ParseError<&'a str> + ContextError<&'a str>,
+{
+    context(
+        "marked section start",
+        preceded(
+            tag("<!["),
+            cut(terminated(
+                map(opt(is_not("[]<>!")), |s: Option<&str>| {
+                    s.unwrap_or_default().trim_matches(is_sgml_whitespace)
+                }),
+                char('['),
+            )),
+        ),
+    )(input)
+}
+
+/// Matches the content for `CDATA` and `RCDATA` marked sections, immediately after [`marked_section_start`].
+///
+/// These sections do nest, meaning they end on the first `]]>` found.
+pub fn marked_section_body_character<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+where
+    E: ParseError<&'a str> + ContextError<&'a str>,
+{
+    use nom::Parser;
+    take_until_terminated(r##"marked section end ("]]>")"##, "]]>").parse(input)
+}
+
+/// Matches the content for `IGNORE` marked sections, immediately after [`marked_section_start`].
+///
+/// The content of `IGNORE` marked sections will match `<![` and `]]>` pairs,
+/// stopping on the first unmatched `]]>` found.
+pub fn marked_section_body_ignore<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+where
+    E: ParseError<&'a str> + ContextError<&'a str>,
+{
+    use nom::{FindSubstring, Parser, Slice};
+    const START: &str = "<![";
+    const END: &str = "]]>";
+    let (close_suffix, close_match) =
+        take_until_terminated(r##"end of marked section ("]]>")"##, END).parse(input)?;
+    match input.find_substring(START) {
+        Some(n) if n < close_match.len() => {
+            let (suffix_after_matched_pair, _) = context(
+                "nested marked section",
+                marked_section_body_ignore,
+            )(input.slice(n + START.len()..))?;
+            let (final_suffix, _) = marked_section_body_ignore(suffix_after_matched_pair)?;
+            Ok((
+                final_suffix,
+                input.slice(..input.len() - final_suffix.len() - END.len()),
+            ))
+        }
+        _ => Ok((close_suffix, close_match)),
+    }
+}
+
+pub fn marked_section_end<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+where
+    E: ParseError<&'a str> + ContextError<&'a str>,
+{
+    tag("]]>")(input)
 }
 
 fn declaration_subset<'a, E>(input: &'a str) -> IResult<&str, &str, E>
@@ -115,14 +181,15 @@ where
     )(input)
 }
 
-pub fn data<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+/// Matches character sequences.
+pub fn text<'a, E>(input: &'a str, mse: MarkedSectionEndHandling) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     verify(
         recognize(tuple((
+            opt(|input| plain_text(input, mse)),
             many0_count(tuple((
-                take_until("<"),
                 tag("<"),
                 not(alt((
                     tag("?"),
@@ -132,15 +199,47 @@ where
                     // Minimally matching start/end tags: "<>", "</>", "<x", or "</x"
                     preceded(opt(tag("/")), alt((name_start, tag(">")))),
                 ))),
+                opt(|input| plain_text(input, mse)),
             ))),
-            take_while(|c| c != '<'),
-            // take_until("<"),
-            // is_not("<"),
         ))),
         |s: &str| !s.is_empty(),
     )(input)
 }
 
+/// Matches until the first `<` (or `]]>` in [`EndOfMarkedSectionHandling::StopParsing`] mode).
+pub fn plain_text<'a, E>(input: &'a str, mse: MarkedSectionEndHandling) -> IResult<&str, &str, E>
+where
+    E: ParseError<&'a str> + ContextError<&'a str>,
+{
+    use nom::{FindSubstring, InputTake};
+    let next_tag = input.find_substring("<").unwrap_or(input.len());
+    let split_pos = match mse {
+        MarkedSectionEndHandling::StopParsing => input
+            .find_substring("]]>")
+            .unwrap_or(next_tag)
+            .min(next_tag),
+        MarkedSectionEndHandling::TreatAsText => next_tag,
+    };
+    if split_pos == 0 {
+        Err(nom::Err::Error(E::from_error_kind(
+            input,
+            ErrorKind::TakeUntil,
+        )))
+    } else {
+        Ok(input.take_split(split_pos))
+    }
+}
+
+/// Defines how [`marked_section_end`] sequences should be handled.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MarkedSectionEndHandling {
+    /// Treat occurrences of `]]>` as plain text.
+    TreatAsText,
+    /// Stop parsing when an occurrence of `]]>` is found.
+    StopParsing,
+}
+
+/// Matches `<foo` and outputs `foo`.
 pub fn open_start_tag<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -148,6 +247,7 @@ where
     preceded(char('<'), name)(input)
 }
 
+/// Matches `>` and outputs it.
 pub fn close_start_tag<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -155,6 +255,7 @@ where
     recognize(char('>'))(input)
 }
 
+/// Matches `/>` and outputs it.
 pub fn xml_close_empty_element<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -162,6 +263,7 @@ where
     tag("/>")(input)
 }
 
+/// Matches `<>` and outputs it.
 pub fn empty_start_tag<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -169,8 +271,22 @@ where
     tag("<>")(input)
 }
 
+/// Matches an attribute key-value pair.
 pub fn attribute<'a, E>(input: &'a str) -> IResult<&str, (&str, Option<&str>), E>
 where
+    E: ParseError<&'a str> + ContextError<&'a str>,
+{
+    attribute_parse_value(input, Ok)
+}
+
+/// Matches an attribute key-value pair, parses the value (if present) with
+/// the given closure, and outputs the key and parsed value.
+pub fn attribute_parse_value<'a, F, T, E>(
+    input: &'a str,
+    mut f: F,
+) -> IResult<&'a str, (&'a str, Option<T>), E>
+where
+    F: FnMut(&'a str) -> Result<T, nom::Err<E>>,
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     context(
@@ -181,7 +297,9 @@ where
                 strip_spaces_around(char('=')),
                 context(
                     "attribute value",
-                    cut(alt((unquoted_attribute_value, quoted_attribute_value))),
+                    cut(map_parser(attribute_value, move |input| {
+                        f(input).map(|value| ("", value))
+                    })),
                 ),
             )),
         ),
@@ -251,7 +369,10 @@ pub fn is_name_char(c: char) -> bool {
 mod tests {
     use super::*;
 
-    type E<'a> = nom::error::Error<&'a str>;
+    type E<'a> = nom::error::VerboseError<&'a str>;
+
+    use MarkedSectionEndHandling::*;
+    const MSE_MODES: [MarkedSectionEndHandling; 2] = [TreatAsText, StopParsing];
 
     #[test]
     fn test_comment_declaration() {
@@ -298,52 +419,111 @@ mod tests {
     }
 
     #[test]
-    fn test_marked_section() {
+    fn test_marked_section_start() {
         assert_eq!(
-            marked_section::<E>("<![IGNORE [ lkjsdflkj sdflkj sdflkj  ]]>"),
-            Ok(("", ("IGNORE", " lkjsdflkj sdflkj sdflkj  ")))
+            marked_section_start::<E>("<![IGNORE [ lkjsdflkj sdflkj sdflkj  ]]>"),
+            Ok((" lkjsdflkj sdflkj sdflkj  ]]>", "IGNORE"))
         );
         assert_eq!(
-            marked_section::<E>("<![ %Some.Condition[<x></x>]]>"),
-            Ok(("", ("%Some.Condition", "<x></x>")))
+            marked_section_start::<E>("<![ %Some.Condition[<x></x>]]>"),
+            Ok(("<x></x>]]>", "%Some.Condition"))
         );
         assert_eq!(
-            marked_section::<E>("<![CDATA[Hello]] world]]>"),
-            Ok(("", ("CDATA", "Hello]] world")))
+            marked_section_start::<E>("<![CDATA[Hello]] world]]>"),
+            Ok(("Hello]] world]]>", "CDATA"))
         );
         assert_eq!(
-            marked_section::<E>("<![ %cond;[ ]]>"),
-            Ok(("", ("%cond;", " ")))
+            marked_section_start::<E>("<![ %cond;[ ]]>"),
+            Ok((" ]]>", "%cond;"))
         );
         assert_eq!(
-            marked_section::<E>("<![ RCDATA TEMP []]>"),
-            Ok(("", ("RCDATA TEMP", "")))
+            marked_section_start::<E>("<![ RCDATA TEMP [ "),
+            Ok((" ", "RCDATA TEMP"))
         );
         assert_eq!(
-            marked_section::<E>("<![INCLUDE []]]>"),
-            Ok(("", ("INCLUDE", "]")))
+            marked_section_start::<E>("<![[]>]]]]]>"),
+            Ok(("]>]]]]]>", ""))
         );
-        const BODY: &str = r##"
-            <!ENTITY % reserved
-                "datasrc     %URI;          #IMPLIED  -- a single or tabular Data Source --
-                 datafld     CDATA          #IMPLIED  -- the property or column name --
-                 dataformatas (plaintext|html) plaintext -- text or html --"
-                 >
-        "##;
+        assert_eq!(marked_section_start::<E>("<![ [abc]]>"), Ok(("abc]]>", "")));
+        marked_section_start::<E>("<![ IGNORE <").unwrap_err();
+        marked_section_start::<E>("<![ IGNORE >").unwrap_err();
+        marked_section_start::<E>("<![ IGNORE ]]>").unwrap_err();
+    }
+
+    #[test]
+    fn test_marked_section_body_character() {
+        assert_eq!(marked_section_body_character::<E>("]]>"), Ok(("", "")));
+        assert_eq!(marked_section_body_character::<E>(" ]]>"), Ok(("", " ")));
         assert_eq!(
-            marked_section::<E>(&format!("<![ %HTML.Reserved; [{}]]>", BODY)),
-            Ok(("", ("%HTML.Reserved;", BODY)))
+            marked_section_body_character::<E>("hello<![CDATA[world]]>]]>"),
+            Ok(("]]>", "hello<![CDATA[world")),
         );
-        assert_eq!(marked_section::<E>("<![[]>]]]]]>"), Ok(("", ("", "]>]]]"))));
-        assert_eq!(marked_section::<E>("<![ [abc]]>"), Ok(("", ("", "abc"))));
-        assert_eq!(marked_section::<E>("<![ []]>"), Ok(("", ("", ""))));
-        assert_eq!(marked_section::<E>("<![[abc]]>"), Ok(("", ("", "abc"))));
-        assert_eq!(marked_section::<E>("<![[]]>"), Ok(("", ("", ""))));
-        marked_section::<E>("<![ IGNORE >").unwrap_err();
-        marked_section::<E>("<![ IGNORE []>").unwrap_err();
-        marked_section::<E>("<![ IGNORE ]]>").unwrap_err();
-        marked_section::<E>("<![ IGNORE [] ]>").unwrap_err();
-        marked_section::<E>("<![ IGNORE []] >").unwrap_err();
+        marked_section_body_character::<E>("").unwrap_err();
+        marked_section_body_character::<E>(" ").unwrap_err();
+        marked_section_body_character::<E>("]]").unwrap_err();
+        marked_section_body_character::<E>("]] >").unwrap_err();
+        marked_section_body_character::<E>("] ]>").unwrap_err();
+    }
+
+    #[test]
+    fn test_marked_section_body_ignore() {
+        assert_eq!(marked_section_body_ignore::<E>("]]>"), Ok(("", "")));
+        assert_eq!(marked_section_body_ignore::<E>(" ]]>"), Ok(("", " ")));
+        assert_eq!(
+            marked_section_body_ignore::<E>(" hello world ]]> "),
+            Ok((" ", " hello world ")),
+        );
+        assert_eq!(
+            marked_section_body_ignore::<E>("<IMG ALT=']]>'>"),
+            Ok(("'>", "<IMG ALT='")),
+        );
+        assert_eq!(
+            marked_section_body_ignore::<E>("<!-- ]]> -->"),
+            Ok((" -->", "<!-- ")),
+        );
+        assert_eq!(
+            marked_section_body_ignore::<E>(r##"<!DOCTYPE "example]]>">"##),
+            Ok(("\">", "<!DOCTYPE \"example")),
+        );
+        assert_eq!(
+            marked_section_body_ignore::<E>("hello]]world]]>]]>"),
+            Ok(("]]>", "hello]]world")),
+        );
+        assert_eq!(
+            marked_section_body_ignore::<E>("hello]]>world]]>]]>"),
+            Ok(("world]]>]]>", "hello")),
+        );
+        assert_eq!(
+            marked_section_body_ignore::<E>("<![hello]]> world]]><![[]]>"),
+            Ok(("<![[]]>", "<![hello]]> world")),
+        );
+        assert_eq!(
+            marked_section_body_ignore::<E>(
+                "<!] <![CDATA[hello]]> <![[CDATA[<![[world]]>]]>]]><![CDATA[!]]>"
+            ),
+            Ok((
+                "<![CDATA[!]]>",
+                "<!] <![CDATA[hello]]> <![[CDATA[<![[world]]>]]>",
+            ))
+        );
+        assert_eq!(
+            marked_section_body_ignore::<E>(
+                "<!] <![CDATA[hello]]> <!]]><![[CDATA[<![[world]]>]]><![CDATA[!]]>"
+            ),
+            Ok((
+                "<![[CDATA[<![[world]]>]]><![CDATA[!]]>",
+                "<!] <![CDATA[hello]]> <!",
+            ))
+        );
+        marked_section_body_ignore::<E>("").unwrap_err();
+        marked_section_body_ignore::<E>("hello").unwrap_err();
+        marked_section_body_ignore::<E>("]>").unwrap_err();
+        marked_section_body_ignore::<E>("<![").unwrap_err();
+        marked_section_body_ignore::<E>("<![]]>").unwrap_err();
+        marked_section_body_ignore::<E>(
+            "<!] <![CDATA[hello]]> <![[CDATA[<![[world]]>]]><![CDATA[!]]>",
+        )
+        .unwrap_err();
     }
 
     #[test]
@@ -433,39 +613,79 @@ mod tests {
     }
 
     #[test]
-    fn test_data() {
-        assert_eq!(data::<E>("foo"), Ok(("", "foo")));
-        assert_eq!(data::<E>("foo>"), Ok(("", "foo>")));
+    fn test_text() {
+        for eom in MSE_MODES {
+            assert_eq!(text::<E>("foo", eom), Ok(("", "foo")));
+            assert_eq!(text::<E>("foo>", eom), Ok(("", "foo>")));
 
-        assert_eq!(data::<E>("foo<x"), Ok(("<x", "foo")));
-        assert_eq!(data::<E>("foo<bar>"), Ok(("<bar>", "foo")));
-        assert_eq!(data::<E>("foo<>"), Ok(("<>", "foo")));
-        assert_eq!(data::<E>("foo</x"), Ok(("</x", "foo")));
-        assert_eq!(data::<E>("foo</>"), Ok(("</>", "foo")));
+            assert_eq!(text::<E>("foo<x", eom), Ok(("<x", "foo")));
+            assert_eq!(text::<E>("foo<bar>", eom), Ok(("<bar>", "foo")));
+            assert_eq!(text::<E>("foo<>", eom), Ok(("<>", "foo")));
+            assert_eq!(text::<E>("foo</x", eom), Ok(("</x", "foo")));
+            assert_eq!(text::<E>("foo</>", eom), Ok(("</>", "foo")));
 
-        assert_eq!(data::<E>("foo<"), Ok(("", "foo<")));
-        assert_eq!(data::<E>("foo< "), Ok(("", "foo< ")));
-        assert_eq!(data::<E>("foo<3"), Ok(("", "foo<3")));
-        assert_eq!(data::<E>("foo< x"), Ok(("", "foo< x")));
+            assert_eq!(text::<E>("foo<", eom), Ok(("", "foo<")));
+            assert_eq!(text::<E>("foo< ", eom), Ok(("", "foo< ")));
+            assert_eq!(text::<E>("foo<3", eom), Ok(("", "foo<3")));
+            assert_eq!(text::<E>("foo< x", eom), Ok(("", "foo< x")));
 
-        assert_eq!(data::<E>("foo<<"), Ok(("", "foo<<")));
-        assert_eq!(data::<E>("foo<<<"), Ok(("", "foo<<<")));
-        assert_eq!(data::<E>("foo<<<x"), Ok(("<x", "foo<<")));
-        assert_eq!(data::<E>("foo<1<2<three<4"), Ok(("<three<4", "foo<1<2")));
-        assert_eq!(data::<E>("foo<<x<"), Ok(("<x<", "foo<")));
-        assert_eq!(data::<E>("<123"), Ok(("", "<123")));
-        assert_eq!(data::<E>("<123</x"), Ok(("</x", "<123")));
+            assert_eq!(text::<E>("foo<<", eom), Ok(("", "foo<<")));
+            assert_eq!(text::<E>("foo<<<", eom), Ok(("", "foo<<<")));
+            assert_eq!(text::<E>("foo<<<x", eom), Ok(("<x", "foo<<")));
+            assert_eq!(
+                text::<E>("foo<1<2<three<4", eom),
+                Ok(("<three<4", "foo<1<2"))
+            );
+            assert_eq!(text::<E>("foo<<x<", eom), Ok(("<x<", "foo<")));
+            assert_eq!(text::<E>("<123", eom), Ok(("", "<123")));
+            assert_eq!(text::<E>("<123</x", eom), Ok(("</x", "<123")));
 
-        assert_eq!(data::<E>("foo<!"), Ok(("", "foo<!")));
-        assert_eq!(data::<E>("foo<! "), Ok(("", "foo<! ")));
-        assert_eq!(data::<E>("foo<!-"), Ok(("<!-", "foo")));
-        assert_eq!(data::<E>("foo<!x"), Ok(("<!x", "foo")));
-        assert_eq!(data::<E>("foo<!["), Ok(("<![", "foo")));
-        assert_eq!(data::<E>("foo<! x"), Ok(("", "foo<! x")));
-        assert_eq!(data::<E>("foo<! -"), Ok(("", "foo<! -")));
-        assert_eq!(data::<E>("foo<! ["), Ok(("", "foo<! [")));
+            assert_eq!(text::<E>("foo<!", eom), Ok(("", "foo<!")));
+            assert_eq!(text::<E>("foo<! ", eom), Ok(("", "foo<! ")));
+            assert_eq!(text::<E>("foo<!-", eom), Ok(("<!-", "foo")));
+            assert_eq!(text::<E>("foo<!x", eom), Ok(("<!x", "foo")));
+            assert_eq!(text::<E>("foo<![", eom), Ok(("<![", "foo")));
+            assert_eq!(text::<E>("foo<! x", eom), Ok(("", "foo<! x")));
+            assert_eq!(text::<E>("foo<! -", eom), Ok(("", "foo<! -")));
+            assert_eq!(text::<E>("foo<! [", eom), Ok(("", "foo<! [")));
 
-        data::<E>("<foo").unwrap_err();
-        data::<E>("</foo>").unwrap_err();
+            text::<E>("<foo", eom).unwrap_err();
+            text::<E>("</foo>", eom).unwrap_err();
+        }
+
+        assert_eq!(
+            text::<E>("foo<]]><bar>", TreatAsText),
+            Ok(("<bar>", "foo<]]>"))
+        );
+        assert_eq!(text::<E>("]]><bar>", TreatAsText), Ok(("<bar>", "]]>")));
+
+        assert_eq!(
+            text::<E>("foo<]]><bar>", StopParsing),
+            Ok(("]]><bar>", "foo<"))
+        );
+        text::<E>("]]><bar>", StopParsing).unwrap_err();
+    }
+
+    #[test]
+    fn test_plain_text() {
+        for eom in MSE_MODES {
+            assert_eq!(plain_text::<E>("x<", eom), Ok(("<", "x")));
+            assert_eq!(plain_text::<E>("x<foo", eom), Ok(("<foo", "x")));
+            plain_text::<E>("<foo", eom).unwrap_err();
+            plain_text::<E>("<#", eom).unwrap_err();
+            plain_text::<E>("<", eom).unwrap_err();
+            assert_eq!(plain_text::<E>("a<b]]>c", eom), Ok(("<b]]>c", "a")));
+            plain_text::<E>("<]]>", eom).unwrap_err();
+        }
+
+        assert_eq!(plain_text::<E>("x]]>", TreatAsText), Ok(("", "x]]>")));
+        assert_eq!(plain_text::<E>("x]]>", StopParsing), Ok(("]]>", "x")));
+        assert_eq!(plain_text::<E>("a]]>b<c", TreatAsText), Ok(("<c", "a]]>b")));
+        assert_eq!(plain_text::<E>("a]]>b<c", StopParsing), Ok(("]]>b<c", "a")));
+
+        assert_eq!(plain_text::<E>("]]>", TreatAsText), Ok(("", "]]>")));
+        plain_text::<E>("]]>", StopParsing).unwrap_err();
+        assert_eq!(plain_text::<E>("]]><", TreatAsText), Ok(("<", "]]>")));
+        plain_text::<E>("]]><", StopParsing).unwrap_err();
     }
 }

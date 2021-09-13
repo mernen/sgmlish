@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use rust_decimal::Decimal;
 use serde::Deserialize;
+use sgmlish::parser::ParserConfig;
 
 fn init_logger() {
     simple_logger::init().ok();
@@ -159,7 +160,7 @@ fn test_ofx() {
                 <DTPOSTED>20190512</DTPOSTED>
                 <TRNAMT>-10.00</TRNAMT>
                 <FITID>25518539-814F-4C2C-97E8-3B49A6D48A45
-                <MEMO>Example International Payment
+                <MEMO>Example International&nbsp;Payment
                 <CURRENCY>
                     <CURRATE>1.1153
                     <CURSYM>EUR
@@ -175,9 +176,7 @@ fn test_ofx() {
         </BANKTRANLIST>
     "##;
 
-    let sgml = sgmlish::parse(input)
-        .unwrap()
-        .trim_spaces()
+    let config = ParserConfig::builder()
         .expand_entities(|entity| match entity {
             "lt" => Some("<"),
             "gt" => Some(">"),
@@ -185,7 +184,10 @@ fn test_ofx() {
             "nbsp" => Some(" "),
             _ => None,
         })
+        .build();
+    let sgml = sgmlish::parser::parse_with(input, &config)
         .unwrap()
+        .trim_spaces()
         .normalize_end_tags()
         .unwrap();
 

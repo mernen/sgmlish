@@ -164,10 +164,6 @@ impl<'a> SgmlFragment<'a> {
         transforms::normalize_end_tags(self)
     }
 
-    pub fn expand_marked_sections(self) -> Result<Self, crate::Error> {
-        transforms::expand_marked_sections(self)
-    }
-
     /// Calls a closure on every identifier (tag name and attribute key),
     /// returning a new `SgmlFragment` with the returned replacements.
     pub fn map_identifiers<F, R>(mut self, mut f: F) -> Self
@@ -310,7 +306,7 @@ impl<'a> SgmlFragment<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use sgmlish::{CData, RcData, SgmlEvent};
     /// # fn main() -> Result<(), sgmlish::Error> {
     /// let sgml = sgmlish::parse(
@@ -347,7 +343,7 @@ impl<'a> SgmlFragment<'a> {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// # use std::collections::HashMap;
     /// # use sgmlish::{CData, RcData, SgmlEvent};
     /// # fn main() -> Result<(), sgmlish::Error> {

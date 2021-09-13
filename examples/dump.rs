@@ -3,6 +3,7 @@
 use std::io::Read;
 use std::process;
 
+use sgmlish::parser::ParserConfig;
 use sgmlish::transforms::Transform;
 use sgmlish::Data::CData;
 use sgmlish::{SgmlEvent, SgmlFragment};
@@ -15,10 +16,22 @@ fn main() {
 }
 
 fn run() -> Result<(), sgmlish::Error> {
+    let config = ParserConfig::builder()
+        .expand_marked_sections()
+        .expand_entities(|entity| match entity {
+            "lt" => Some("<"),
+            "gt" => Some(">"),
+            "amp" => Some("&"),
+            "quot" => Some("\""),
+            "apos" => Some("'"),
+            _ => None,
+        })
+        .build();
+
     let mut sgml = String::new();
     std::io::stdin().read_to_string(&mut sgml).unwrap();
 
-    let mut fragment = sgmlish::parse(&sgml)?;
+    let fragment = sgmlish::parser::parse_with(&sgml, &config)?;
 
     println!("ℹ️  Roundtrip:");
     println!("{}", fragment);
@@ -30,30 +43,8 @@ fn run() -> Result<(), sgmlish::Error> {
     }
     println!();
 
-    if fragment
-        .iter()
-        .any(|e| matches!(e, SgmlEvent::MarkedSection(..)))
-    {
-        println!("ℹ️  Marked sections expanded:");
-        fragment = fragment.expand_marked_sections()?;
-        println!("{}", fragment);
-        println!();
-    }
-
     println!("ℹ️  Spaces trimmed:");
     let fragment = fragment.trim_spaces();
-    println!("{}", fragment);
-    println!();
-
-    println!("ℹ️  Expanded entities:");
-    let fragment = fragment.expand_entities(|entity| match entity {
-        "lt" => Some("<"),
-        "gt" => Some(">"),
-        "amp" => Some("&"),
-        "quot" => Some("\""),
-        "apos" => Some("'"),
-        _ => None,
-    })?;
     println!("{}", fragment);
     println!();
 
