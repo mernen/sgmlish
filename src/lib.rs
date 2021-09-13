@@ -5,7 +5,7 @@
 mod data;
 pub mod entities;
 pub mod error;
-mod event_list;
+mod fragment;
 pub mod parser;
 pub mod transforms;
 mod util;
@@ -15,7 +15,7 @@ use std::fmt::{self, Write};
 
 pub use data::*;
 pub use error::{Error, Result};
-pub use event_list::*;
+pub use fragment::*;
 pub use parser::{parse, ParseError};
 use util::make_owned;
 
