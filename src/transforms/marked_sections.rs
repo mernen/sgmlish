@@ -91,11 +91,11 @@ pub fn expand_marked_section<'a>(
 
     match status {
         MarkedSectionStatus::Ignore => Ok(vec![].into()),
-        MarkedSectionStatus::CData => Ok(vec![SgmlEvent::Data(Data::CData(content))].into()),
-        MarkedSectionStatus::RcData => Ok(vec![SgmlEvent::Data(Data::RcData(content))].into()),
+        MarkedSectionStatus::CData => Ok(vec![SgmlEvent::Character(Data::CData(content))].into()),
+        MarkedSectionStatus::RcData => Ok(vec![SgmlEvent::Character(Data::RcData(content))].into()),
         MarkedSectionStatus::Include => {
             if is_blank(&content) {
-                return Ok(vec![SgmlEvent::Data(Data::RcData(content))].into());
+                return Ok(vec![SgmlEvent::Character(Data::RcData(content))].into());
             }
 
             let events = match content {
@@ -153,25 +153,25 @@ mod tests {
         assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(SgmlEvent::Data(Data::RcData("Start ".into())))
+            Some(SgmlEvent::Character(Data::RcData("Start ".into())))
         );
         assert_eq!(
             events.next(),
-            Some(SgmlEvent::Data(Data::RcData(" First ".into())))
+            Some(SgmlEvent::Character(Data::RcData(" First ".into())))
         );
         assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("FOO".into())));
         assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(SgmlEvent::Data(Data::RcData(" item ".into())))
+            Some(SgmlEvent::Character(Data::RcData(" item ".into())))
         );
         assert_eq!(
             events.next(),
-            Some(SgmlEvent::Data(Data::RcData("mid".into())))
+            Some(SgmlEvent::Character(Data::RcData("mid".into())))
         );
         assert_eq!(
             events.next(),
-            Some(SgmlEvent::Data(Data::RcData(" <BAR> text ".into())))
+            Some(SgmlEvent::Character(Data::RcData(" <BAR> text ".into())))
         );
         assert_eq!(events.next(), Some(SgmlEvent::EndTag("FOO".into())));
         assert_eq!(events.next(), Some(SgmlEvent::EndTag("TEST".into())));
@@ -204,7 +204,7 @@ mod tests {
 
         assert_eq!(
             expanded.next(),
-            Some(SgmlEvent::Data(Data::CData("".into())))
+            Some(SgmlEvent::Character(Data::CData("".into())))
         );
         assert_eq!(expanded.next(), None);
     }
@@ -219,7 +219,7 @@ mod tests {
         assert_eq!(expanded.next(), Some(SgmlEvent::CloseStartTag));
         assert_eq!(
             expanded.next(),
-            Some(SgmlEvent::Data(Data::RcData("Hello".into())))
+            Some(SgmlEvent::Character(Data::RcData("Hello".into())))
         );
         assert_eq!(expanded.next(), Some(SgmlEvent::EndTag("b".into())));
         assert_eq!(expanded.next(), None);
@@ -233,18 +233,18 @@ mod tests {
 
         assert_eq!(
             expanded.next(),
-            Some(SgmlEvent::Data(Data::RcData(" ".into())))
+            Some(SgmlEvent::Character(Data::RcData(" ".into())))
         );
         assert_eq!(expanded.next(), Some(SgmlEvent::OpenStartTag("b".into())));
         assert_eq!(expanded.next(), Some(SgmlEvent::CloseStartTag));
         assert_eq!(
             expanded.next(),
-            Some(SgmlEvent::Data(Data::RcData(" Hello ".into())))
+            Some(SgmlEvent::Character(Data::RcData(" Hello ".into())))
         );
         assert_eq!(expanded.next(), Some(SgmlEvent::EndTag("b".into())));
         assert_eq!(
             expanded.next(),
-            Some(SgmlEvent::Data(Data::RcData(" ".into())))
+            Some(SgmlEvent::Character(Data::RcData(" ".into())))
         );
         assert_eq!(expanded.next(), None);
     }
@@ -257,7 +257,7 @@ mod tests {
 
         assert_eq!(
             expanded.next(),
-            Some(SgmlEvent::Data(Data::RcData("\n\n".into())))
+            Some(SgmlEvent::Character(Data::RcData("\n\n".into())))
         );
         assert_eq!(expanded.next(), None);
     }
@@ -270,7 +270,7 @@ mod tests {
 
         assert_eq!(
             expanded.next(),
-            Some(SgmlEvent::Data(Data::RcData("".into())))
+            Some(SgmlEvent::Character(Data::RcData("".into())))
         );
         assert_eq!(expanded.next(), None);
     }
@@ -287,7 +287,7 @@ mod tests {
 
         assert_eq!(
             expanded.next(),
-            Some(SgmlEvent::Data(Data::RcData("</ ".into())))
+            Some(SgmlEvent::Character(Data::RcData("</ ".into())))
         );
         assert_eq!(expanded.next(), None);
     }

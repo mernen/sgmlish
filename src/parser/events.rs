@@ -181,7 +181,7 @@ pub fn data<'a, E>(input: &'a str) -> IResult<&str, SgmlEvent, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    map(raw::data, |s| SgmlEvent::Data(Data::RcData(s.into())))(input)
+    map(raw::data, |s| SgmlEvent::Character(Data::RcData(s.into())))(input)
 }
 
 /// An iterator over a sequence of events.
@@ -307,49 +307,49 @@ mod tests {
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Data(RcData("\n                ".into())))
+            Some(Character(RcData("\n                ".into())))
         );
         assert_eq!(events.next(), Some(OpenStartTag("HEAD".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Data(RcData("\n                    ".into())))
+            Some(Character(RcData("\n                    ".into())))
         );
         assert_eq!(events.next(), Some(OpenStartTag("TITLE".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Data(RcData("My first HTML document".into())))
+            Some(Character(RcData("My first HTML document".into())))
         );
         assert_eq!(events.next(), Some(EndTag("TITLE".into())));
         assert_eq!(
             events.next(),
-            Some(Data(RcData("\n                ".into())))
+            Some(Character(RcData("\n                ".into())))
         );
         assert_eq!(events.next(), Some(EndTag("HEAD".into())));
         assert_eq!(
             events.next(),
-            Some(Data(RcData("\n                ".into())))
+            Some(Character(RcData("\n                ".into())))
         );
 
         assert_eq!(events.next(), Some(OpenStartTag("BODY".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Data(RcData("\n                    ".into())))
+            Some(Character(RcData("\n                    ".into())))
         );
 
         assert_eq!(events.next(), Some(OpenStartTag("P".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Data(RcData("Hello world!\n                ".into())))
+            Some(Character(RcData("Hello world!\n                ".into())))
         );
 
         assert_eq!(events.next(), Some(EndTag("BODY".into())));
-        assert_eq!(events.next(), Some(Data(RcData("\n            ".into()))));
+        assert_eq!(events.next(), Some(Character(RcData("\n            ".into()))));
         assert_eq!(events.next(), Some(EndTag("HTML".into())));
-        assert_eq!(events.next(), Some(Data(RcData("\n        ".into()))));
+        assert_eq!(events.next(), Some(Character(RcData("\n        ".into()))));
     }
 
     #[test]

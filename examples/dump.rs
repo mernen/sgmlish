@@ -84,7 +84,7 @@ fn reindent(fragment: SgmlFragment) -> SgmlFragment {
         for _ in 0..level {
             s.push_str("  ");
         }
-        SgmlEvent::Data(CData(s.into()))
+        SgmlEvent::Character(CData(s.into()))
     }
 
     for (i, event) in fragment.iter().enumerate() {
@@ -93,7 +93,7 @@ fn reindent(fragment: SgmlFragment) -> SgmlFragment {
         }
         match event {
             SgmlEvent::OpenStartTag(_)
-            | SgmlEvent::Data(_)
+            | SgmlEvent::Character(_)
             | SgmlEvent::ProcessingInstruction(_)
             | SgmlEvent::MarkupDeclaration(_) => {
                 transform.insert_at(i, indent(indent_level));

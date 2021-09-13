@@ -66,7 +66,7 @@ impl<'a> SgmlFragment<'a> {
         crate::de::from_fragment(self)
     }
 
-    /// Removes leading and trailing spaces from the data events.
+    /// Removes leading and trailing spaces from the character events.
     /// Empty events are then removed.
     ///
     /// # Example
@@ -323,14 +323,14 @@ impl<'a> SgmlFragment<'a> {
     /// // We start with unexpanded replaceable character data (RcData)
     /// assert_eq!(
     ///     sgml.as_slice()[2],
-    ///     SgmlEvent::Data(RcData("This is an &#60;example&#62; element".into()))
+    ///     SgmlEvent::Character(RcData("This is an &#60;example&#62; element".into()))
     /// );
     ///
     /// let expanded = sgml.expand_character_references()?;
     /// // The expanded form is now character data (CData)
     /// assert_eq!(
     ///     expanded.as_slice()[2],
-    ///     SgmlEvent::Data(CData("This is an <example> element".into()))
+    ///     SgmlEvent::Character(CData("This is an <example> element".into()))
     /// );
     /// # Ok(())
     /// # }
@@ -366,14 +366,14 @@ impl<'a> SgmlFragment<'a> {
     /// // We start with unexpanded replaceable character data (RcData)
     /// assert_eq!(
     ///     sgml.as_slice()[2],
-    ///     SgmlEvent::Data(RcData("This is an &lt;example&gt; element".into()))
+    ///     SgmlEvent::Character(RcData("This is an &lt;example&gt; element".into()))
     /// );
     ///
     /// let expanded = sgml.expand_entities(|entity| entities.get(entity))?;
     /// // The expanded form is now character data (CData)
     /// assert_eq!(
     ///     expanded.as_slice()[2],
-    ///     SgmlEvent::Data(CData("This is an <example> element".into()))
+    ///     SgmlEvent::Character(CData("This is an <example> element".into()))
     /// );
     /// # Ok(())
     /// # }

@@ -179,7 +179,7 @@ impl<'de> SgmlDeserializer<'de> {
             .find_map(|event| match event {
                 SgmlEvent::OpenStartTag(_) => Some(true),
                 SgmlEvent::EndTag(_) => Some(false),
-                SgmlEvent::Data(data) if !data.is_blank() => {
+                SgmlEvent::Character(data) if !data.is_blank() => {
                     contains_text = true;
                     None
                 }
@@ -203,7 +203,7 @@ impl<'de> SgmlDeserializer<'de> {
             None => return Ok(()),
         };
         match event {
-            SgmlEvent::Data(data) => {
+            SgmlEvent::Character(data) => {
                 let expanded = mem::take(data).expand_character_references()?;
                 *data = expanded;
                 Ok(())
@@ -218,7 +218,7 @@ impl<'de> SgmlDeserializer<'de> {
                 if let Ok(data) =
                     transforms::extract_data_marked_section(status_keywords, mem::take(content))
                 {
-                    *event = SgmlEvent::Data(data.expand_character_references()?);
+                    *event = SgmlEvent::Character(data.expand_character_references()?);
                     Ok(())
                 } else {
                     Err(DeserializationError::UnexpectedMarkedSection)
@@ -348,7 +348,7 @@ impl<'de> SgmlDeserializer<'de> {
                         break;
                     }
                 }
-                SgmlEvent::Data(data) => {
+                SgmlEvent::Character(data) => {
                     text.push_data(data);
                     self.advance()?;
                 }
@@ -802,7 +802,7 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
                     }
                     ContentStrategy::TextOnly => unreachable!(),
                 },
-                SgmlEvent::Data(data) => {
+                SgmlEvent::Character(data) => {
                     if let Some(value_acc) = &mut self.text_content {
                         value_acc.push_data(data);
                     }
@@ -876,7 +876,7 @@ impl<'de, 'r> de::SeqAccess<'de> for SeqAccess<'de, 'r> {
                         return Ok(Some(seed.deserialize(&mut *self.de)?));
                     }
                 },
-                SgmlEvent::Data(data) if data.is_blank() => {
+                SgmlEvent::Character(data) if data.is_blank() => {
                     self.de.advance()?;
                 }
                 _ => return Ok(None),

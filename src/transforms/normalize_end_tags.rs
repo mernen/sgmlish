@@ -51,7 +51,7 @@ pub(crate) fn normalize_end_tags(
                 stack.push(name);
                 next_insertion_point = i;
             }
-            SgmlEvent::Data(data) => {
+            SgmlEvent::Character(data) => {
                 if next_insertion_point == i + 1 && data.is_blank() {
                     next_insertion_point -= 1;
                 }

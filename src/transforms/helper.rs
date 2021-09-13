@@ -34,9 +34,9 @@ impl<'a> Transform<'a> {
     ///     /* 0 */ SgmlEvent::OpenStartTag("A".into()),
     ///     /* 1 */ SgmlEvent::Attribute("HREF".into(), Some(RcData("/".into()))),
     ///     /* 2 */ SgmlEvent::CloseStartTag,
-    ///     /* 3 */ SgmlEvent::Data(RcData("hello".into())),
+    ///     /* 3 */ SgmlEvent::Character(RcData("hello".into())),
     ///     /* 4 */ SgmlEvent::EndTag("A".into()),
-    ///     /* 5 */ SgmlEvent::Data(RcData("!".into())),
+    ///     /* 5 */ SgmlEvent::Character(RcData("!".into())),
     ///     /* 6 */
     /// ]);
     ///
@@ -52,7 +52,7 @@ impl<'a> Transform<'a> {
     ///     vec![
     ///         SgmlEvent::OpenStartTag("A".into()),
     ///         SgmlEvent::CloseStartTag,
-    ///         SgmlEvent::Data(RcData("hello".into())),
+    ///         SgmlEvent::Character(RcData("hello".into())),
     ///         SgmlEvent::EndTag("A".into()),
     ///     ]
     /// );
@@ -77,7 +77,7 @@ impl<'a> Transform<'a> {
     ///     /* 0 */ SgmlEvent::OpenStartTag("A".into()),
     ///     /* 1 */ SgmlEvent::Attribute("HREF".into(), Some(RcData("/".into()))),
     ///     /* 2 */ SgmlEvent::CloseStartTag,
-    ///     /* 3 */ SgmlEvent::Data(RcData("hello".into())),
+    ///     /* 3 */ SgmlEvent::Character(RcData("hello".into())),
     ///     /* 4 */
     /// ]);
     ///
@@ -95,7 +95,7 @@ impl<'a> Transform<'a> {
     ///         SgmlEvent::Attribute("HREF".into(), Some(RcData("/".into()))),
     ///         SgmlEvent::Attribute("TARGET".into(), Some(RcData("_blank".into()))),
     ///         SgmlEvent::CloseStartTag,
-    ///         SgmlEvent::Data(RcData("hello".into())),
+    ///         SgmlEvent::Character(RcData("hello".into())),
     ///         SgmlEvent::EndTag("A".into()),
     ///     ]
     /// );
@@ -209,7 +209,7 @@ mod tests {
             SgmlEvent::OpenStartTag("A".into()),
             SgmlEvent::Attribute("HREF".into(), Some(RcData("/".into()))),
             SgmlEvent::CloseStartTag,
-            SgmlEvent::Data(RcData("hello".into())),
+            SgmlEvent::Character(RcData("hello".into())),
             SgmlEvent::EndTag("A".into()),
         ]);
 
@@ -227,7 +227,7 @@ mod tests {
                 SgmlEvent::OpenStartTag("A".into()),
                 SgmlEvent::Attribute("NAME".into(), Some(RcData("greeting".into()))),
                 SgmlEvent::CloseStartTag,
-                SgmlEvent::Data(RcData("hello".into())),
+                SgmlEvent::Character(RcData("hello".into())),
                 SgmlEvent::EndTag("A".into()),
             ])
         );

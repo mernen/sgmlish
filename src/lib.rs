@@ -43,7 +43,7 @@ pub enum SgmlEvent<'a> {
     MarkupDeclaration(Cow<'a, str>),
     /// A processing instruction, e.g. `<?EXAMPLE>`
     ProcessingInstruction(Cow<'a, str>),
-    /// A marked section, like `<![CDATA[ ... ]]>`.
+    /// A marked section, like `<![IGNORE[...]]>`.
     MarkedSection(Cow<'a, str>, Cow<'a, str>),
     /// The beginning of a start-element tag, e.g. `<EXAMPLE`.
     ///
@@ -62,7 +62,7 @@ pub enum SgmlEvent<'a> {
     /// with an empty slice.
     EndTag(Cow<'a, str>),
     /// Any string of characters that is not part of a tag.
-    Data(Data<'a>),
+    Character(Data<'a>),
 }
 
 impl<'a> SgmlEvent<'a> {
@@ -80,7 +80,7 @@ impl<'a> SgmlEvent<'a> {
             SgmlEvent::CloseStartTag => SgmlEvent::CloseStartTag,
             SgmlEvent::XmlCloseEmptyElement => SgmlEvent::XmlCloseEmptyElement,
             SgmlEvent::EndTag(name) => SgmlEvent::EndTag(make_owned(name)),
-            SgmlEvent::Data(data) => SgmlEvent::Data(data.into_owned()),
+            SgmlEvent::Character(data) => SgmlEvent::Character(data.into_owned()),
         }
     }
 }
@@ -119,7 +119,7 @@ impl fmt::Display for SgmlEvent<'_> {
             SgmlEvent::CloseStartTag => f.write_str(">"),
             SgmlEvent::XmlCloseEmptyElement => f.write_str("/>"),
             SgmlEvent::EndTag(name) => write!(f, "</{}>", name),
-            SgmlEvent::Data(value) => fmt::Display::fmt(&value.escape(), f),
+            SgmlEvent::Character(value) => fmt::Display::fmt(&value.escape(), f),
         }
     }
 }
@@ -186,7 +186,7 @@ mod tests {
         assert_eq!(format!("{}", EndTag("foo".into())), "</foo>");
         assert_eq!(format!("{}", EndTag("".into())), "</>");
 
-        assert_eq!(format!("{}", Data(RcData("hello".into()))), "hello");
+        assert_eq!(format!("{}", Character(RcData("hello".into()))), "hello");
     }
 
     #[test]
