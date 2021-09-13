@@ -279,31 +279,6 @@ mod tests {
     type E<'a> = nom::error::Error<&'a str>;
 
     #[test]
-    fn test_event_display() {
-        assert_eq!(
-            format!("{}", MarkupDeclaration("<?DOCTYPE HTML?>".into())),
-            "<?DOCTYPE HTML?>"
-        );
-        assert_eq!(
-            format!("{}", ProcessingInstruction("<?IS10744 FSIDR myurl>".into())),
-            "<?IS10744 FSIDR myurl>"
-        );
-
-        assert_eq!(format!("{}", OpenStartTag("foo".into())), "<foo");
-        assert_eq!(
-            format!("{}", Attribute("foo".into(), Some(RcData("bar".into())))),
-            "foo=\"bar\""
-        );
-        assert_eq!(format!("{}", Attribute("foo".into(), None)), "foo");
-        assert_eq!(format!("{}", CloseStartTag), ">");
-        assert_eq!(format!("{}", XmlCloseEmptyElement), "/>");
-        assert_eq!(format!("{}", EndTag("foo".into())), "</foo>");
-        assert_eq!(format!("{}", EndTag("".into())), "</>");
-
-        assert_eq!(format!("{}", Data(RcData("hello".into()))), "hello");
-    }
-
-    #[test]
     fn test_document_entity() {
         const SAMPLE: &str = r#"
             <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
