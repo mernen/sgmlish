@@ -397,6 +397,18 @@ mod tests {
             Ok((">\"", ("foo", Some("quoted "))))
         );
         assert_eq!(
+            attribute::<E>("foo='<!-- comment' -->"),
+            Ok((" -->", ("foo", Some("<!-- comment"))))
+        );
+        assert_eq!(
+            attribute::<E>("foo='<!SGML \"ex'ample\">"),
+            Ok(("ample\">", ("foo", Some("<!SGML \"ex"))))
+        );
+        assert_eq!(
+            attribute::<E>("foo=\"<![IGNORE[x\"]]>"),
+            Ok(("]]>", ("foo", Some("<![IGNORE[x"))))
+        );
+        assert_eq!(
             attribute::<E>("foo = <bar>"),
             Ok((">", ("foo", Some("<bar"))))
         );
@@ -406,6 +418,7 @@ mod tests {
         );
         attribute::<E>("foo='value").unwrap_err();
         attribute::<E>("foo=\"value").unwrap_err();
+        attribute::<E>("foo =").unwrap_err();
         attribute::<E>("foo = >").unwrap_err();
     }
 
