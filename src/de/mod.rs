@@ -8,7 +8,6 @@ use serde::de::{self, IntoDeserializer, Unexpected};
 use serde::Deserializer;
 
 use crate::de::buffer::CowBuffer;
-use crate::entities::EntityError;
 use crate::{SgmlEvent, SgmlFragment};
 
 mod buffer;
@@ -94,26 +93,9 @@ pub enum DeserializationError {
     ExpectedStartTag,
     #[error("mismatched close tag: expected </{expected}>, found </{found}>")]
     MismatchedCloseTag { expected: String, found: String },
-    /// Empty tags (`<>`) and empty close tags (`</>`) are not directly
-    /// supported by the deserializer.
-    /// If you wish to support them in your inputs, write a transform that
-    /// first normalizes them into full start/end tags.
-    #[error("unsupported tag: {tag}")]
-    UnsupportedTag { tag: SgmlEvent<'static> },
-    /// Error when decoding an [`RcData`](crate::Data::RcData) section.
-    ///
-    /// If you wish to support entity references, see [`expand_entities`](SgmlFragment::expand_entities).
-    #[error(transparent)]
-    EntityError {
-        #[from]
-        source: EntityError,
-    },
-    /// Marked sections (`<![INCLUDE[example]]>`) are not directly supported
-    /// by the deserializer.
-    /// If you wish to support them in your inputs, use a transform like
-    /// [`expand_marked_sections`](SgmlFragment::expand_marked_sections).
-    #[error("unexpected marked section -- expand marked sections first")]
-    UnexpectedMarkedSection,
+    /// An event which is not supported by deserialization was found.
+    #[error("deserialization of '{0}' is not supported")]
+    Unsupported(SgmlEvent<'static>),
 
     #[error("error parsing integer value: {source}")]
     ParseIntError {
@@ -197,17 +179,19 @@ impl<'de> SgmlDeserializer<'de> {
     /// Rejects unsupported events (like empty start tags), ignores markup declarations and processing instructions,
     /// and ensures any `Data` is expanded
     fn normalize_at_cursor(&mut self) -> Result<(), DeserializationError> {
+        fn consume(event: &mut SgmlEvent) -> SgmlEvent<'static> {
+            mem::replace(event, SgmlEvent::ProcessingInstruction("*CONSUMED*".into())).into_owned()
+        }
+
         let event = match self.events.get_mut(self.pos) {
             Some(event) => event,
             None => return Ok(()),
         };
         match event {
             SgmlEvent::MarkupDeclaration(_) | SgmlEvent::ProcessingInstruction(_) => self.advance(),
-            SgmlEvent::MarkedSection(..) => Err(DeserializationError::UnexpectedMarkedSection),
+            SgmlEvent::MarkedSection(..) => Err(DeserializationError::Unsupported(consume(event))),
             SgmlEvent::OpenStartTag(name) | SgmlEvent::EndTag(name) if name.is_empty() => {
-                Err(DeserializationError::UnsupportedTag {
-                    tag: event.clone().into_owned(),
-                })
+                Err(DeserializationError::Unsupported(consume(event)))
             }
             _ => Ok(()),
         }
