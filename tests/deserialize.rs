@@ -160,7 +160,7 @@ fn test_ofx() {
                 <DTPOSTED>20190512</DTPOSTED>
                 <TRNAMT>-10.00</TRNAMT>
                 <FITID>25518539-814F-4C2C-97E8-3B49A6D48A45
-                <MEMO>Example International&nbsp;Payment
+                <MEMO>Example International Payment&nbsp;
                 <CURRENCY>
                     <CURRATE>1.1153
                     <CURSYM>EUR
@@ -187,7 +187,6 @@ fn test_ofx() {
         .build();
     let sgml = sgmlish::parser::parse_with(input, &config)
         .unwrap()
-        .trim_spaces()
         .normalize_end_tags()
         .unwrap();
 
@@ -209,7 +208,7 @@ fn test_ofx() {
     assert_eq!(trn.dtposted, "20190512");
     assert_eq!(trn.amount, Decimal::from(-10));
     assert_eq!(trn.fitid, "25518539-814F-4C2C-97E8-3B49A6D48A45");
-    assert_eq!(trn.memo.as_deref(), Some("Example International Payment"));
+    assert_eq!(trn.memo.as_deref(), Some("Example International Payment "));
     assert_eq!(
         trn.currency,
         Some(Currency {
@@ -254,7 +253,6 @@ fn test_html_style_boolean() {
 
     let sgml = sgmlish::parse(input)
         .unwrap()
-        .trim_spaces()
         .lowercase_identifiers()
         .normalize_end_tags()
         .unwrap();
@@ -297,7 +295,7 @@ fn test_complex_enum() {
             <item>Unit</item>
         </test>
     "##;
-    let sgml = sgmlish::parse(input).unwrap().trim_spaces();
+    let sgml = sgmlish::parse(input).unwrap();
 
     let expected = Test {
         items: vec![
@@ -349,7 +347,7 @@ fn test_complex_enum_no_containing_element() {
             <Unit></Unit>
         </test>
     "##;
-    let sgml = sgmlish::parse(input).unwrap().trim_spaces();
+    let sgml = sgmlish::parse(input).unwrap();
 
     let expected = Test {
         items: vec![
@@ -395,7 +393,7 @@ fn test_sequence_of_tuples() {
             <n>6</n>
         </test>
     "##;
-    let sgml = sgmlish::parse(input).unwrap().trim_spaces();
+    let sgml = sgmlish::parse(input).unwrap();
 
     let expected = Test {
         coords: vec![(1, 2), (3, 4), (5, 6)],

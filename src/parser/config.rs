@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 use crate::marked_sections::MarkedSectionStatus;
-use crate::{entities, Data};
+use crate::{entities, is_sgml_whitespace, Data};
 
 // Import used for documentation links
 #[allow(unused_imports)]
@@ -82,6 +82,14 @@ impl ParserConfig {
         ParserConfigBuilder::new()
     }
 
+    pub fn trim<'a>(&self, text: &'a str) -> &'a str {
+        if self.trim_whitespace {
+            text.trim_matches(is_sgml_whitespace)
+        } else {
+            text
+        }
+    }
+
     pub fn parse_rcdata<'a>(&self, rcdata: &'a str) -> crate::Result<Data<'a>> {
         let f = self.entity_fn.as_deref().unwrap_or(&|_| None);
         entities::expand_entities(rcdata, f)
@@ -153,6 +161,11 @@ impl ParserConfigBuilder {
     /// By default, only `CDATA` and `RCDATA` marked sections are accepted.
     pub fn expand_marked_sections(mut self) -> Self {
         self.config.marked_section_handling = MarkedSectionHandling::ExpandAll;
+        self
+    }
+
+    pub fn trim_whitespace(mut self, trim_whitespace: bool) -> Self {
+        self.config.trim_whitespace = trim_whitespace;
         self
     }
 

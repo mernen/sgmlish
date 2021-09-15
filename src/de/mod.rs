@@ -49,7 +49,6 @@ mod buffer;
 ///     </SELECT>
 /// "##;
 /// let sgml = sgmlish::parse(sgml)?
-///     .trim_spaces()
 ///     .lowercase_identifiers();
 /// let select = sgmlish::from_fragment::<Select>(sgml)?;
 ///

@@ -66,47 +66,6 @@ impl<'a> SgmlFragment<'a> {
         crate::de::from_fragment(self)
     }
 
-    /// Removes leading and trailing spaces from the character events.
-    /// Empty events are then removed.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # fn main() -> Result<(), sgmlish::Error> {
-    /// use sgmlish::RcData;
-    /// use sgmlish::SgmlEvent::*;
-    ///
-    /// let indented = sgmlish::parse(r##"
-    ///     <HTML>
-    ///         <BODY>
-    ///             <P CLASS=" intro ">
-    ///                 Hello, world!
-    ///             </P>
-    ///         </BODY>
-    ///     </HTML>
-    /// "##)?;
-    /// let unindented = sgmlish::parse(r##"<HTML><BODY><P CLASS=" intro ">Hello, world!</P></BODY></HTML>"##)?;
-    ///
-    /// assert_eq!(indented.trim_spaces(), unindented);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn trim_spaces(self) -> Self {
-        self.map_data(|data, key| {
-            if key.is_some() {
-                // Attribute values are not trimmed
-                Some(data)
-            } else {
-                let trimmed = data.trim();
-                if trimmed.as_str().is_empty() {
-                    None
-                } else {
-                    Some(trimmed)
-                }
-            }
-        })
-    }
-
     /// Inserts omitted end tags, assuming they are only implied for text-only content.
     ///
     /// This is good enough for certain formats, like [OFX] 1.x, but not for others, e.g. [HTML].
@@ -135,7 +94,7 @@ impl<'a> SgmlFragment<'a> {
     ///             <MEMO>Example
     ///         </STMTTRN>
     ///     </BANKTRANLIST>
-    /// "##)?.trim_spaces();
+    /// "##)?;
     ///
     /// let normalized = sgmlish::parse(r##"
     ///     <BANKTRANLIST>
@@ -149,7 +108,7 @@ impl<'a> SgmlFragment<'a> {
     ///             <MEMO>Example</MEMO>
     ///         </STMTTRN>
     ///     </BANKTRANLIST>
-    /// "##)?.trim_spaces();
+    /// "##)?;
     ///
     /// assert_eq!(end_tags_implied.normalize_end_tags()?, normalized);
     /// # Ok(())

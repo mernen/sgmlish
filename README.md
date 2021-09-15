@@ -82,7 +82,6 @@ let sgml =
     // Phase 1: tokenization
     sgmlish::parse(input)?
     // Phase 2: normalization
-    .trim_spaces()
     .lowercase_identifiers();
 // Phase 3: deserialization
 let example = sgmlish::from_fragment::<Crate>(sgml)?;
@@ -96,7 +95,6 @@ let example = sgmlish::from_fragment::<Crate>(sgml)?;
 
     Some passes of interest:
 
-    * [`trim_spaces`]: removes whitespace surrounding tags.
     * [`lowercase_identifiers`]: most SGML is case-insensitive; this will
       normalize all tag and attribute names to lowercase.
     * [`normalize_end_tags`]: inserts omitted end tags, assuming they are
@@ -198,7 +196,6 @@ let example = sgmlish::from_fragment::<Crate>(sgml)?;
 [`expand_marked_sections`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.expand_marked_sections
 [`lowercase_identifiers`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.lowercase_identifiers
 [`normalize_end_tags`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.normalize_end_tags
-[`trim_spaces`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.trim_spaces
 
 [Build status]: https://github.com/mernen/sgmlish/actions/workflows/ci.yml/badge.svg
 [Version badge]: https://img.shields.io/crates/v/sgmlish.svg

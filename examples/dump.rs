@@ -43,11 +43,6 @@ fn run() -> Result<(), sgmlish::Error> {
     }
     println!();
 
-    println!("ℹ️  Spaces trimmed:");
-    let fragment = fragment.trim_spaces();
-    println!("{}", fragment);
-    println!();
-
     println!("ℹ️  Normalized to lowercase:");
     let fragment = fragment.lowercase_identifiers();
     println!("{}", fragment);

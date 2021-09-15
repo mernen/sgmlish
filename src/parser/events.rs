@@ -124,11 +124,13 @@ where
                 map(raw::marked_section_body_ignore, |_| EventIter::empty())(rest)
             }
             MarkedSectionStatus::CData => map(raw::marked_section_body_character, |content| {
-                EventIter::once(SgmlEvent::Character(Data::CData(content.into())))
+                EventIter::once(SgmlEvent::Character(Data::CData(
+                    config.trim(content).into(),
+                )))
             })(rest),
             MarkedSectionStatus::RcData => map_res(raw::marked_section_body_character, |content| {
                 Ok(EventIter::once(SgmlEvent::Character(
-                    config.parse_rcdata(content)?,
+                    config.parse_rcdata(config.trim(content))?,
                 )))
             })(rest),
             MarkedSectionStatus::Include => terminated(
@@ -178,7 +180,13 @@ where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
 {
     alt((
-        map(|input| text(input, config, mse), EventIter::once),
+        map(
+            |input| text(input, config, mse),
+            |event| match event {
+                Some(event) => EventIter::once(event),
+                None => EventIter::empty(),
+            },
+        ),
         |input| start_tag(input, config),
         map(end_tag, EventIter::once),
         map(processing_instruction, EventIter::once),
@@ -272,13 +280,19 @@ pub fn text<'a, E>(
     input: &'a str,
     config: &ParserConfig,
     mse: MarkedSectionEndHandling,
-) -> IResult<&'a str, SgmlEvent<'a>, E>
+) -> IResult<&'a str, Option<SgmlEvent<'a>>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
 {
     map_res(
         |input| raw::text(input, mse),
-        |s| Ok(SgmlEvent::Character(config.parse_rcdata(s)?)),
+        |s| {
+            let s = config.trim(s);
+            if s.is_empty() {
+                return Ok(None);
+            }
+            Ok(Some(SgmlEvent::Character(config.parse_rcdata(s)?)))
+        },
     )(input)
 }
 
@@ -400,7 +414,7 @@ mod tests {
     type E<'a> = nom::error::Error<&'a str>;
 
     #[test]
-    fn test_document_entity() {
+    fn test_document_entity_default_config() {
         const SAMPLE: &str = r#"
             <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
                 "http://www.w3.org/TR/html4/strict.dtd">
@@ -414,6 +428,56 @@ mod tests {
             </HTML>
         "#;
         let (rest, mut events) = document_entity::<E>(SAMPLE, &Default::default()).unwrap();
+        assert!(rest.is_empty(), "rest: {:?}", rest);
+
+        assert_eq!(
+            events.next(),
+            Some(MarkupDeclaration(
+                "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\"\n                \"http://www.w3.org/TR/html4/strict.dtd\">"
+                    .into()
+            ))
+        );
+
+        assert_eq!(events.next(), Some(OpenStartTag("HTML".into())));
+        assert_eq!(events.next(), Some(CloseStartTag));
+        assert_eq!(events.next(), Some(OpenStartTag("HEAD".into())));
+        assert_eq!(events.next(), Some(CloseStartTag));
+        assert_eq!(events.next(), Some(OpenStartTag("TITLE".into())));
+        assert_eq!(events.next(), Some(CloseStartTag));
+        assert_eq!(
+            events.next(),
+            Some(Character(CData("My first HTML document".into())))
+        );
+        assert_eq!(events.next(), Some(EndTag("TITLE".into())));
+        assert_eq!(events.next(), Some(EndTag("HEAD".into())));
+
+        assert_eq!(events.next(), Some(OpenStartTag("BODY".into())));
+        assert_eq!(events.next(), Some(CloseStartTag));
+
+        assert_eq!(events.next(), Some(OpenStartTag("P".into())));
+        assert_eq!(events.next(), Some(CloseStartTag));
+        assert_eq!(events.next(), Some(Character(CData("Hello world!".into()))));
+
+        assert_eq!(events.next(), Some(EndTag("BODY".into())));
+        assert_eq!(events.next(), Some(EndTag("HTML".into())));
+    }
+
+    #[test]
+    fn test_document_entity_retain_whitespace() {
+        const SAMPLE: &str = r#"
+            <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+                "http://www.w3.org/TR/html4/strict.dtd">
+            <HTML>
+                <HEAD>
+                    <TITLE>My first HTML document</TITLE>
+                </HEAD>
+                <BODY>
+                    <P>Hello world!
+                </BODY>
+            </HTML>
+        "#;
+        let config = ParserConfig::builder().trim_whitespace(false).build();
+        let (rest, mut events) = document_entity::<E>(SAMPLE, &config).unwrap();
         assert!(rest.is_empty(), "rest: {:?}", rest);
 
         assert_eq!(
@@ -491,6 +555,26 @@ mod tests {
         assert_eq!(
             events.next(),
             Some(Attribute("target".into(), Some(CData("_blank".into()))))
+        );
+        assert_eq!(events.next(), Some(CloseStartTag));
+        assert_eq!(events.next(), None);
+    }
+
+    #[test]
+    fn test_start_tag_trim_whitespace_does_not_affect_attributes() {
+        let config = ParserConfig::builder().trim_whitespace(true).build();
+        let (rest, mut events) =
+            start_tag::<E>("<img alt=' test ' longdesc=\" desc\">", &config).unwrap();
+        assert_eq!(rest, "");
+
+        assert_eq!(events.next(), Some(OpenStartTag("img".into())));
+        assert_eq!(
+            events.next(),
+            Some(Attribute("alt".into(), Some(CData(" test ".into()))))
+        );
+        assert_eq!(
+            events.next(),
+            Some(Attribute("longdesc".into(), Some(CData(" desc".into()))))
         );
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
