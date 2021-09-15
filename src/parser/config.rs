@@ -22,9 +22,9 @@ type EntityFn = Box<dyn Fn(&str) -> Option<Cow<'static, str>>>;
 /// How marked sections (`<![CDATA[example]]>`) should be handled.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MarkedSectionHandling {
-    /// Leave all marked sections as [`MarkedSection`](SgmlEvent::MarkedSection)
+    /// Keep all marked sections as [`MarkedSection`](SgmlEvent::MarkedSection)
     /// events in the stream.
-    LeaveUnmodified,
+    KeepUnmodified,
     /// Expand `CDATA` and `RCDATA` sections into [`Character`][SgmlEvent::Character] events,
     /// treat anything else as a parse error.
     AcceptOnlyCharacterData,
@@ -155,13 +155,17 @@ impl ParserConfigBuilder {
         self
     }
 
+    pub fn marked_section_handling(mut self, mode: MarkedSectionHandling) -> Self {
+        self.config.marked_section_handling = mode;
+        self
+    }
+
     /// Enables support for all marked sections, including `<![INCLUDE[...]]>`
     /// and `<![IGNORE[...]]>`.
     ///
     /// By default, only `CDATA` and `RCDATA` marked sections are accepted.
-    pub fn expand_marked_sections(mut self) -> Self {
-        self.config.marked_section_handling = MarkedSectionHandling::ExpandAll;
-        self
+    pub fn expand_marked_sections(self) -> Self {
+        self.marked_section_handling(MarkedSectionHandling::ExpandAll)
     }
 
     pub fn trim_whitespace(mut self, trim_whitespace: bool) -> Self {

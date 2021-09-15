@@ -40,7 +40,6 @@ transforms.
 * The following SGML features are hard to properly implement without full doctype
   awareness during parsing, and are therefore beyond the scope of this library:
   * NET (Null End Tag) forms: `<FOO/example/`
-  * Nested marked sections: `<![INCLUDE[ outer <![IGNORE[ inner ]]> ]]>`
   * Custom definitions of character sets, like `SEPCHAR` or `LCNMSTRT`
 
 

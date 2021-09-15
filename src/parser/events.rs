@@ -102,7 +102,7 @@ where
     };
 
     match marked_section_handling {
-        MarkedSectionHandling::LeaveUnmodified => {
+        MarkedSectionHandling::KeepUnmodified => {
             let (rest, content) = match status {
                 MarkedSectionStatus::Ignore => raw::marked_section_body_ignore(rest),
                 MarkedSectionStatus::CData => raw::marked_section_body_character(rest),

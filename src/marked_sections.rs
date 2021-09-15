@@ -71,8 +71,6 @@ pub enum ExpandMarkedSectionError<'a, E> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse_with, Data, ParserConfig, SgmlEvent};
-
     use super::*;
 
     #[test]
@@ -128,106 +126,5 @@ mod tests {
             MarkedSectionStatus::from_keywords("ignore unknown temp"),
             Err("unknown")
         );
-    }
-
-    #[test]
-    fn test_expand_marked_sections_trim_whitespace() {
-        let config = ParserConfig::builder().expand_marked_sections().build();
-        let mut events = parse_with(
-            "\
-                <TEST>\
-                    Start \
-                    <![[ First <FOO> item ]]>\
-                    <![RCDATA IGNORE[ <BAR> text ]]>\
-                    mid\
-                    <![IGNORE[ Second <FOO> item ]]>\
-                    <![TEMP RCDATA[ <BAR> text ]]>\
-                    </FOO>\
-                </TEST>\
-            ",
-            &config,
-        )
-        .unwrap()
-        .into_iter();
-
-        assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
-        assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData("Start".into())))
-        );
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData("First".into())))
-        );
-        assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("FOO".into())));
-        assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData("item".into())))
-        );
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData("mid".into())))
-        );
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData("<BAR> text".into())))
-        );
-        assert_eq!(events.next(), Some(SgmlEvent::EndTag("FOO".into())));
-        assert_eq!(events.next(), Some(SgmlEvent::EndTag("TEST".into())));
-        assert_eq!(events.next(), None);
-    }
-
-    #[test]
-    fn test_expand_marked_sections_keep_whitespace() {
-        let config = ParserConfig::builder()
-            .expand_marked_sections()
-            .trim_whitespace(false)
-            .build();
-        let mut events = parse_with(
-            "\
-                <TEST>\
-                    Start \
-                    <![[ First <FOO> item ]]>\
-                    <![RCDATA IGNORE[ <BAR> text ]]>\
-                    mid\
-                    <![IGNORE[ Second <FOO> item ]]>\
-                    <![TEMP RCDATA[ <BAR> text ]]>\
-                    </FOO>\
-                </TEST>\
-            ",
-            &config,
-        )
-        .unwrap()
-        .into_iter();
-
-        assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
-        assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData("Start ".into())))
-        );
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData(" First ".into())))
-        );
-        assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("FOO".into())));
-        assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData(" item ".into())))
-        );
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData("mid".into())))
-        );
-        assert_eq!(
-            events.next(),
-            Some(SgmlEvent::Character(Data::CData(" <BAR> text ".into())))
-        );
-        assert_eq!(events.next(), Some(SgmlEvent::EndTag("FOO".into())));
-        assert_eq!(events.next(), Some(SgmlEvent::EndTag("TEST".into())));
-        assert_eq!(events.next(), None);
     }
 }

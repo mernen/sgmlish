@@ -537,6 +537,7 @@ mod tests {
 
         accept("<?> ", " ");
         accept("<?style tt = font courier>\n", "\n");
+        accept("<?/experiment>", "");
         // XML-style processing instructions are not strictly SGML, but welp
         accept(
             r#"<?xml-stylesheet href="example.xslt" type="text/xsl"?>>"#,
