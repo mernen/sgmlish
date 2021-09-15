@@ -1,6 +1,4 @@
-use std::borrow::Cow;
 use std::fmt::{self, Write};
-use std::mem;
 
 use never::Never;
 
@@ -121,105 +119,6 @@ impl<'a> SgmlFragment<'a> {
     /// [`uppercase_identifiers`]: SgmlFragment::uppercase_identifiers
     pub fn normalize_end_tags(self) -> Result<Self, transforms::NormalizationError> {
         transforms::normalize_end_tags(self)
-    }
-
-    /// Calls a closure on every identifier (tag name and attribute key),
-    /// returning a new `SgmlFragment` with the returned replacements.
-    pub fn map_identifiers<F, R>(mut self, mut f: F) -> Self
-    where
-        F: FnMut(Cow<'a, str>) -> R,
-        R: Into<Cow<'a, str>>,
-    {
-        let mut transform = |slot: &mut Cow<'a, str>| {
-            let id = mem::take(slot);
-            *slot = f(id).into();
-        };
-
-        for event in &mut self {
-            match event {
-                SgmlEvent::OpenStartTag(name) => transform(name),
-                SgmlEvent::EndTag(name) => {
-                    if !name.is_empty() {
-                        transform(name);
-                    }
-                }
-                SgmlEvent::Attribute(key, _) => transform(key),
-                _ => {}
-            }
-        }
-        self
-    }
-
-    /// Normalizes all identifiers (tag names and attribute keys) as ASCII lowercase.
-    /// [`Data`], markup declarations and processing instructions are not affected.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # fn main() -> Result<(), sgmlish::Error> {
-    /// let case_insensitive = sgmlish::parse(r##"
-    ///     <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-    ///     <Html>
-    ///         <body>
-    ///             <IMG src="underconstruction.gif">
-    ///         </body>
-    ///     </html>
-    /// "##)?;
-    ///
-    /// let normalized = sgmlish::parse(r##"
-    ///     <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-    ///     <html>
-    ///         <body>
-    ///             <img src="underconstruction.gif">
-    ///         </body>
-    ///     </html>
-    /// "##)?;
-    ///
-    /// assert_eq!(case_insensitive.lowercase_identifiers(), normalized);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn lowercase_identifiers(self) -> Self {
-        self.map_identifiers(|mut name| {
-            name.to_mut().make_ascii_lowercase();
-            name
-        })
-    }
-
-    /// Normalizes all identifiers (tag names and attribute keys) as ASCII uppercase.
-    /// [`Data`], markup declarations and processing instructions are not affected.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # fn main() -> Result<(), sgmlish::Error> {
-    /// let case_insensitive = sgmlish::parse(r##"
-    ///     <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-    ///     <Html>
-    ///         <body>
-    ///             <IMG src="underconstruction.gif">
-    ///         </body>
-    ///     </html>
-    /// "##)?;
-    ///
-    /// let normalized = sgmlish::parse(r##"
-    ///     <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-    ///     <HTML>
-    ///         <BODY>
-    ///             <IMG SRC="underconstruction.gif">
-    ///         </BODY>
-    ///     </HTML>
-    /// "##)?;
-    ///
-    /// assert_eq!(case_insensitive.uppercase_identifiers(), normalized);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn uppercase_identifiers(self) -> Self {
-        self.map_identifiers(|mut name| {
-            name.to_mut().make_ascii_uppercase();
-            name
-        })
     }
 
     /// Calls a closure on every fragment of character data (element content and attribute value),

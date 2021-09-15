@@ -12,12 +12,47 @@ pub struct ParserConfig {
     /// When `true`, leading and trailing whitespace from [`Character`](SgmlEvent::Character) events will be trimmed.
     /// Defaults to `true`.
     pub trim_whitespace: bool,
+    /// Defines how tag and attribute names should be handled.
+    pub name_normalization: NameNormalization,
     pub marked_section_handling: MarkedSectionHandling,
     entity_fn: Option<EntityFn>,
     parameter_entity_fn: Option<EntityFn>,
 }
 
 type EntityFn = Box<dyn Fn(&str) -> Option<Cow<'static, str>>>;
+
+/// How tag and attribute names should be handled.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NameNormalization {
+    /// Keep tag and attribute names as-is.
+    Unchanged,
+    /// Normalize all tag and attribute names to lowercase.
+    ToLowercase,
+    /// Normalize all tag and attribute names to uppercase.
+    ToUppercase,
+}
+
+impl Default for NameNormalization {
+    fn default() -> Self {
+        NameNormalization::Unchanged
+    }
+}
+
+impl NameNormalization {
+    pub fn normalize<'a>(&self, mut name: Cow<'a, str>) -> Cow<'a, str> {
+        match self {
+            NameNormalization::ToLowercase if name.chars().any(|c| c.is_ascii_uppercase()) => {
+                name.to_mut().make_ascii_lowercase();
+                name
+            }
+            NameNormalization::ToUppercase if name.chars().any(|c| c.is_ascii_lowercase()) => {
+                name.to_mut().make_ascii_uppercase();
+                name
+            }
+            _ => name,
+        }
+    }
+}
 
 /// How marked sections (`<![CDATA[example]]>`) should be handled.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,6 +98,7 @@ impl ParserConfig {
     /// The default settings are:
     ///
     /// * Whitespace is automatically trimmed
+    /// * Tag and attribute names are kept in original form
     /// * Only `CDATA` and `RCDATA` marked sections are allowed;
     ///   `IGNORE` and `INCLUDE` blocks, for instance, are rejected
     /// * Only character references (`&#33;`) are accepted; all entities (`&example;`)
@@ -71,7 +107,8 @@ impl ParserConfig {
     pub fn new() -> Self {
         ParserConfig {
             trim_whitespace: true,
-            marked_section_handling: MarkedSectionHandling::AcceptOnlyCharacterData,
+            name_normalization: Default::default(),
+            marked_section_handling: Default::default(),
             entity_fn: None,
             parameter_entity_fn: None,
         }
@@ -133,6 +170,22 @@ pub struct ParserConfigBuilder {
 impl ParserConfigBuilder {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    /// Defines how tag and attribute names should be normalized.
+    pub fn name_normalization(mut self, name_normalization: NameNormalization) -> Self {
+        self.config.name_normalization = name_normalization;
+        self
+    }
+
+    /// Normalizes all tag and attribute names to lowercase.
+    pub fn lowercase_names(self) -> Self {
+        self.name_normalization(NameNormalization::ToLowercase)
+    }
+
+    /// Normalizes all tag and attribute names to lowercase.
+    pub fn uppercase_names(self) -> Self {
+        self.name_normalization(NameNormalization::ToUppercase)
     }
 
     /// Defines a closure to be used to resolve entities.

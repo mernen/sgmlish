@@ -251,9 +251,9 @@ fn test_html_style_boolean() {
         </FORM>
     "##;
 
-    let sgml = sgmlish::parse(input)
+    let config = ParserConfig::builder().lowercase_names().build();
+    let sgml = sgmlish::parse_with(input, &config)
         .unwrap()
-        .lowercase_identifiers()
         .normalize_end_tags()
         .unwrap();
     let form = sgmlish::from_fragment::<Form>(sgml).unwrap();

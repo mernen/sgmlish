@@ -188,7 +188,7 @@ where
             },
         ),
         |input| start_tag(input, config),
-        map(end_tag, EventIter::once),
+        map(|input| end_tag(input, config), EventIter::once),
         map(processing_instruction, EventIter::once),
         |input| marked_section(input, config),
         // When all else fails, sinalize we expected at least opening a tag
@@ -205,7 +205,7 @@ where
         alt((
             map(
                 tuple((
-                    strip_spaces_after(open_start_tag),
+                    strip_spaces_after(|input| open_start_tag(input, config)),
                     many0(strip_spaces_after(|input| attribute(input, config))),
                     cut(alt((xml_close_empty_element, close_start_tag))),
                 )),
@@ -216,12 +216,15 @@ where
     )(input)
 }
 
-pub fn open_start_tag<'a, E>(input: &'a str) -> IResult<&'a str, SgmlEvent<'a>, E>
+pub fn open_start_tag<'a, E>(
+    input: &'a str,
+    config: &ParserConfig,
+) -> IResult<&'a str, SgmlEvent<'a>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     map(raw::open_start_tag, |name| {
-        SgmlEvent::OpenStartTag(name.into())
+        SgmlEvent::OpenStartTag(config.name_normalization.normalize(name.into()))
     })(input)
 }
 
@@ -261,18 +264,22 @@ where
 {
     map_res(raw::attribute, |(key, value)| {
         Ok(SgmlEvent::Attribute(
-            key.into(),
+            config.name_normalization.normalize(key.into()),
             value.map(|value| config.parse_rcdata(value)).transpose()?,
         ))
     })(input)
 }
 
-fn end_tag<'a, E>(input: &'a str) -> IResult<&'a str, SgmlEvent<'a>, E>
+fn end_tag<'a, E>(input: &'a str, config: &ParserConfig) -> IResult<&'a str, SgmlEvent<'a>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     map(raw::end_tag, |name| {
-        SgmlEvent::EndTag(name.unwrap_or_default().into())
+        SgmlEvent::EndTag(
+            config
+                .name_normalization
+                .normalize(name.unwrap_or_default().into()),
+        )
     })(input)
 }
 
@@ -561,6 +568,46 @@ mod tests {
     }
 
     #[test]
+    fn test_start_tag_normalize_lowercase() {
+        let config = ParserConfig::builder().lowercase_names().build();
+        let (rest, mut events) =
+            start_tag::<E>("<A HREF='test.htm' \ntArget = _blank > ok", &config).unwrap();
+        assert_eq!(rest, " ok");
+
+        assert_eq!(events.next(), Some(OpenStartTag("a".into())));
+        assert_eq!(
+            events.next(),
+            Some(Attribute("href".into(), Some(CData("test.htm".into()))))
+        );
+        assert_eq!(
+            events.next(),
+            Some(Attribute("target".into(), Some(CData("_blank".into()))))
+        );
+        assert_eq!(events.next(), Some(CloseStartTag));
+        assert_eq!(events.next(), None);
+    }
+
+    #[test]
+    fn test_start_tag_normalize_uppercase() {
+        let config = ParserConfig::builder().uppercase_names().build();
+        let (rest, mut events) =
+            start_tag::<E>("<A href='test.htm' \ntArget = _blank > ok", &config).unwrap();
+        assert_eq!(rest, " ok");
+
+        assert_eq!(events.next(), Some(OpenStartTag("A".into())));
+        assert_eq!(
+            events.next(),
+            Some(Attribute("HREF".into(), Some(CData("test.htm".into()))))
+        );
+        assert_eq!(
+            events.next(),
+            Some(Attribute("TARGET".into(), Some(CData("_blank".into()))))
+        );
+        assert_eq!(events.next(), Some(CloseStartTag));
+        assert_eq!(events.next(), None);
+    }
+
+    #[test]
     fn test_start_tag_trim_whitespace_does_not_affect_attributes() {
         let config = ParserConfig::builder().trim_whitespace(true).build();
         let (rest, mut events) =
@@ -604,9 +651,30 @@ mod tests {
 
     #[test]
     fn test_end_tag() {
-        assert_eq!(end_tag::<E>("</x>"), Ok(("", EndTag("x".into()))));
-        assert_eq!(end_tag::<E>("</foo\n>"), Ok(("", EndTag("foo".into()))));
-        assert_eq!(end_tag::<E>("</>"), Ok(("", EndTag("".into()))));
+        let config = Default::default();
+        assert_eq!(
+            end_tag::<E>("</x>>", &config),
+            Ok((">", EndTag("x".into())))
+        );
+        assert_eq!(
+            end_tag::<E>("</Foo\n> ", &config),
+            Ok((" ", EndTag("Foo".into())))
+        );
+        assert_eq!(end_tag::<E>("</>", &config), Ok(("", EndTag("".into()))));
+
+        let config = ParserConfig::builder().lowercase_names().build();
+        assert_eq!(end_tag::<E>("</x>", &config), Ok(("", EndTag("x".into()))));
+        assert_eq!(
+            end_tag::<E>("</Foo\n>", &config),
+            Ok(("", EndTag("foo".into())))
+        );
+
+        let config = ParserConfig::builder().uppercase_names().build();
+        assert_eq!(end_tag::<E>("</x>", &config), Ok(("", EndTag("X".into()))));
+        assert_eq!(
+            end_tag::<E>("</Foo\n>", &config),
+            Ok(("", EndTag("FOO".into())))
+        );
     }
 
     #[test]

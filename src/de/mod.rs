@@ -48,8 +48,10 @@ mod buffer;
 ///         <OPTION>Blue</OPTION>
 ///     </SELECT>
 /// "##;
-/// let sgml = sgmlish::parse(sgml)?
-///     .lowercase_identifiers();
+/// let config = sgmlish::ParserConfig::builder()
+///     .lowercase_names()
+///     .build();
+/// let sgml = sgmlish::parse_with(sgml, &config)?;
 /// let select = sgmlish::from_fragment::<Select>(sgml)?;
 ///
 /// println!("Deserialized:\n{:#?}", select);

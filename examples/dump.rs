@@ -43,11 +43,6 @@ fn run() -> Result<(), sgmlish::Error> {
     }
     println!();
 
-    println!("ℹ️  Normalized to lowercase:");
-    let fragment = fragment.lowercase_identifiers();
-    println!("{}", fragment);
-    println!();
-
     println!("ℹ️  Attempting to fill end tags:");
     let fragment = fragment.normalize_end_tags()?;
     println!("{}", fragment);
