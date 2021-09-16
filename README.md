@@ -68,44 +68,37 @@ struct Example {
 }
 ```
 
-Usage deviates a bit from other deserializers. The process is usually split in three phases:
+Usage is typically performed in three steps:
 
 ```rust
 let input = r##"
     <CRATE>
-        <NAME>sgmlish</NAME>
-        <VERSION>0.1</VERSION>
+        <NAME>sgmlish
+        <VERSION>0.1
     </CRATE>
 "##;
-let sgml =
-    // Phase 1: tokenization
-    sgmlish::parse(input)?
-    // Phase 2: normalization
-    .lowercase_identifiers();
-// Phase 3: deserialization
-let example = sgmlish::from_fragment::<Crate>(sgml)?;
+// Step 1: configure parser, then parse string
+let sgml = sgmlish::Parser::build()
+    .lowercase_names()
+    .parse(input)?;
+// Step 2: normalization/validation
+let sgml = sgmlish::transforms::normalize_end_tags(sgml)?;
+// Step 3: deserialize into the desired type
+let example = sgmlish::from_fragment::<Example>(sgml)?;
 ```
 
-1.  Tokenization: `sgmlish::parse()` is invoked on an input string, producing a
-    *fragment*, which is a series of *events*.
+1.  Parsing: configure an [`sgmlish::Parser`] as desired --- for example, by
+    normalizing tag names or defining how entities (`&example;`) should be resolved.
+    Once it's configured, feed it the SGML string.
 
-2.  Normalization: because SGML is so flexible, you'll almost certainly want to
-    apply a few normalization passes to the data before deserializing.
+2.  Normalization/validation: as the parser is not aware of DTDs, it does not know
+    how to insert implied end tags, if those are accepted in your use case, or
+    how to handle other more esoteric SGML features, like empty tags.
+    *This must be fixed before proceding with deserialization.*
 
-    Some passes of interest:
-
-    * [`lowercase_identifiers`]: most SGML is case-insensitive; this will
-      normalize all tag and attribute names to lowercase.
-    * [`normalize_end_tags`]: inserts omitted end tags, assuming they are
-      omitted only when the element cannot contain child elements.
-      This algorithm is good enough for many SGML applications, like [OFX].
-    * [`expand_entities`]: allows you to support `&entities;` in text content.
-      No entities are supported by default, only character references (`&#32;`).
-    * [`expand_marked_sections`]: processes marked sections, like `<![IGNORE[x]]>`.
-      Only simple `CDATA` and `RCDATA` sections are processed by default.
-
-    A very important rule: before proceding with deserialization, all start tags
-    must have a matching end tag with identical case, in a consistent hierarchy.
+    A normalization transform is offered with this library: [`normalize_end_tags`].
+    It assumes end tags are only omitted when the element cannot contain child
+    elements. This algorithm is good enough for many SGML applications, like [OFX].
 
 3.  Deserialization: once the event stream is normalized, pass on to Serde
     and let it do its magic.
@@ -191,10 +184,8 @@ let example = sgmlish::from_fragment::<Crate>(sgml)?;
 [Serde]: https://serde.rs
 [serde-xml-rs]: https://lib.rs/crates/serde-xml-rs
 [xml-rs]: https://lib.rs/crates/xml-rs
-[`expand_entities`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.expand_entities
-[`expand_marked_sections`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.expand_marked_sections
-[`lowercase_identifiers`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.lowercase_identifiers
-[`normalize_end_tags`]: https://docs.rs/sgmlish/*/sgmlish/struct.SgmlFragment.html#method.normalize_end_tags
+[`sgmlish::Parser`]: https://docs.rs/sgmlish/*/sgmlish/sgmlish/parser/struct.Parser.html
+[`normalize_end_tags`]: https://docs.rs/sgmlish/*/sgmlish/transforms/fn.normalize_end_tags.html
 
 [Build status]: https://github.com/mernen/sgmlish/actions/workflows/ci.yml/badge.svg
 [Version badge]: https://img.shields.io/crates/v/sgmlish.svg

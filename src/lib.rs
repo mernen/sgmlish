@@ -17,7 +17,7 @@ use std::fmt::{self, Write};
 pub use data::*;
 pub use error::{Error, Result};
 pub use fragment::*;
-pub use parser::{parse, parse_with, ParseError, ParserConfig};
+pub use parser::{parse, Parser, ParserConfig};
 use util::make_owned;
 
 #[cfg(feature = "serde")]

@@ -1,4 +1,4 @@
-use sgmlish::{parse_with, Data, ParserConfig, SgmlEvent};
+use sgmlish::{Data, Parser, SgmlEvent};
 
 const SGML: &str = r##"
     <!DOCTYPE test>
@@ -20,14 +20,15 @@ const SGML: &str = r##"
 
 #[test]
 fn test_include_trim_whitespace() {
-    let config = ParserConfig::builder()
+    let mut events = Parser::builder()
         .expand_marked_sections()
         .expand_parameter_entities(|entity| {
             assert_eq!(entity, "cond");
             Some("INCLUDE")
         })
-        .build();
-    let mut events = parse_with(SGML, &config).unwrap().into_iter();
+        .parse(SGML)
+        .unwrap()
+        .into_iter();
 
     assert_eq!(
         events.next(),
@@ -89,12 +90,13 @@ fn test_include_trim_whitespace() {
 
 #[test]
 fn test_include_keep_whitespace() {
-    let config = ParserConfig::builder()
+    let mut events = Parser::builder()
         .trim_whitespace(false)
         .expand_marked_sections()
         .expand_parameter_entities(|_| Some("INCLUDE"))
-        .build();
-    let mut events = parse_with(SGML, &config).unwrap().into_iter();
+        .parse(SGML)
+        .unwrap()
+        .into_iter();
 
     assert_eq!(
         events.next(),
@@ -196,11 +198,12 @@ fn test_include_keep_whitespace() {
 
 #[test]
 fn test_ignore_trim_whitespace() {
-    let config = ParserConfig::builder()
+    let mut events = Parser::builder()
         .expand_marked_sections()
         .expand_parameter_entities(|_| Some("IGNORE"))
-        .build();
-    let mut events = parse_with(SGML, &config).unwrap().into_iter();
+        .parse(SGML)
+        .unwrap()
+        .into_iter();
 
     assert_eq!(
         events.next(),
@@ -235,11 +238,12 @@ fn test_ignore_trim_whitespace() {
 
 #[test]
 fn test_cdata_trim_whitespace() {
-    let config = ParserConfig::builder()
+    let mut events = Parser::builder()
         .expand_marked_sections()
         .expand_parameter_entities(|_| Some("CDATA"))
-        .build();
-    let mut events = parse_with(SGML, &config).unwrap().into_iter();
+        .parse(SGML)
+        .unwrap()
+        .into_iter();
 
     assert_eq!(
         events.next(),
@@ -303,11 +307,12 @@ fn test_cdata_trim_whitespace() {
 
 #[test]
 fn test_keep_unmodified_include_trim_whitespace() {
-    let config = ParserConfig::builder()
+    let mut events = Parser::builder()
         .marked_section_handling(sgmlish::parser::MarkedSectionHandling::KeepUnmodified)
         .expand_parameter_entities(|_| Some("INCLUDE"))
-        .build();
-    let mut events = parse_with(SGML, &config).unwrap().into_iter();
+        .parse(SGML)
+        .unwrap()
+        .into_iter();
 
     assert_eq!(
         events.next(),
@@ -364,11 +369,12 @@ fn test_keep_unmodified_include_trim_whitespace() {
 
 #[test]
 fn test_keep_unmodified_ignore_trim_whitespace() {
-    let config = ParserConfig::builder()
+    let mut events = Parser::builder()
         .marked_section_handling(sgmlish::parser::MarkedSectionHandling::KeepUnmodified)
         .expand_parameter_entities(|_| Some("IGNORE"))
-        .build();
-    let mut events = parse_with(SGML, &config).unwrap().into_iter();
+        .parse(SGML)
+        .unwrap()
+        .into_iter();
 
     assert_eq!(
         events.next(),

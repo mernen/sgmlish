@@ -1,56 +1,28 @@
+//! Access to configuration and inner workings of the parser.
+
 use std::fmt;
 use std::ops::Deref;
 
-use nom::Finish;
-
 use crate::SgmlFragment;
 
-pub use self::config::*;
+pub use self::parser::*;
 
-mod config;
 pub mod events;
+mod parser;
 pub mod raw;
 pub mod util;
 
 pub(crate) type DefaultErrorType<I> = nom::error::VerboseError<I>;
 
-/// Parses the given string, yielding an [`SgmlFragment`].
+/// Parses the given string using a [`Parser`] with default settings,
+/// then yielding an [`SgmlFragment`].
 ///
-/// This list can then be adjusted as desired, and later deserialized using [`from_fragment`].
+/// After inserting implied end tags (if necessary), use [`from_fragment`]
+/// to deserialize into a specific type.
 ///
 /// [`from_fragment`]: crate::from_fragment
-pub fn parse(input: &str) -> Result<SgmlFragment, ParseError<&str, DefaultErrorType<&str>>> {
-    parse_with(input, &Default::default())
-}
-
-/// Parses the given string with a custom parser configuration and error type.
-///
-/// Different error types can make different tradeoffs between performance and level of detail.
-pub fn parse_with<'a>(
-    input: &'a str,
-    config: &ParserConfig,
-) -> Result<SgmlFragment<'a>, ParseError<&'a str, DefaultErrorType<&'a str>>> {
-    parse_with_error(input, config)
-}
-
-pub fn parse_with_error<'a, E>(
-    input: &'a str,
-    config: &ParserConfig,
-) -> Result<SgmlFragment<'a>, ParseError<&'a str, E>>
-where
-    E: nom::error::ParseError<&'a str>
-        + nom::error::ContextError<&'a str>
-        + nom::error::FromExternalError<&'a str, crate::Error>
-        + fmt::Display,
-{
-    let (rest, events) = events::document_entity::<E>(input, config)
-        .finish()
-        .map_err(|error| ParseError::from_nom(input, error))?;
-    debug_assert!(rest.is_empty(), "document_entity should be all_consuming");
-
-    let events = events.collect::<Vec<_>>();
-
-    Ok(SgmlFragment::from(events))
+pub fn parse(input: &str) -> crate::Result<SgmlFragment> {
+    Parser::new().parse(input)
 }
 
 /// The error type for parse errors.
@@ -66,7 +38,11 @@ pub struct ParseError<I, E> {
     error: E,
 }
 
-impl<I: Deref<Target = str>, E> ParseError<I, E> {
+impl<I, E> ParseError<I, E>
+where
+    I: Deref<Target = str>,
+    E: nom::error::ParseError<I>,
+{
     pub(crate) fn from_nom(input: I, error: E) -> Self {
         ParseError { input, error }
     }
@@ -74,6 +50,11 @@ impl<I: Deref<Target = str>, E> ParseError<I, E> {
     /// Returns the original input for this error.
     pub fn input(&self) -> &str {
         &self.input
+    }
+
+    /// Returns the internal error produced by the parsing functions.
+    pub fn into_inner(self) -> E {
+        self.error
     }
 }
 

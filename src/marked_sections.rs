@@ -2,7 +2,7 @@
 
 use std::str::FromStr;
 
-use crate::ParseError;
+use crate::parser::ParseError;
 
 const KEYWORDS: &[(&str, MarkedSectionStatus)] = &[
     ("CDATA", MarkedSectionStatus::CData),

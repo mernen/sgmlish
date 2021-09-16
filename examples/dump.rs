@@ -3,7 +3,6 @@
 use std::io::Read;
 use std::process;
 
-use sgmlish::parser::ParserConfig;
 use sgmlish::transforms::Transform;
 use sgmlish::Data::CData;
 use sgmlish::{SgmlEvent, SgmlFragment};
@@ -15,8 +14,8 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), sgmlish::Error> {
-    let config = ParserConfig::builder()
+fn run() -> sgmlish::Result<()> {
+    let parser = sgmlish::Parser::builder()
         .expand_marked_sections()
         .expand_entities(|entity| match entity {
             "lt" => Some("<"),
@@ -31,7 +30,7 @@ fn run() -> Result<(), sgmlish::Error> {
     let mut sgml = String::new();
     std::io::stdin().read_to_string(&mut sgml).unwrap();
 
-    let fragment = sgmlish::parser::parse_with(&sgml, &config)?;
+    let fragment = parser.parse(&sgml)?;
 
     println!("ℹ️  Roundtrip:");
     println!("{}", fragment);
@@ -44,7 +43,7 @@ fn run() -> Result<(), sgmlish::Error> {
     println!();
 
     println!("ℹ️  Attempting to fill end tags:");
-    let fragment = fragment.normalize_end_tags()?;
+    let fragment = sgmlish::transforms::normalize_end_tags(fragment)?;
     println!("{}", fragment);
     println!();
 

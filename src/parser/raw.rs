@@ -206,7 +206,7 @@ where
     )(input)
 }
 
-/// Matches until the first `<` (or `]]>` in [`EndOfMarkedSectionHandling::StopParsing`] mode).
+/// Matches until the first `<` (or `]]>` in [`MarkedSectionEndHandling::StopParsing`] mode).
 pub fn plain_text<'a, E>(input: &'a str, mse: MarkedSectionEndHandling) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,

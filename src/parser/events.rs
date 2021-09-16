@@ -14,7 +14,7 @@ use nom::IResult;
 use crate::marked_sections::MarkedSectionStatus;
 use crate::{Data, Error, SgmlEvent};
 
-use super::config::ParserConfig;
+use super::parser::ParserConfig;
 use super::raw::{self, comment_declaration, MarkedSectionEndHandling};
 use super::util::{comments_and_spaces, strip_comments_and_spaces_after, strip_spaces_after};
 use super::MarkedSectionHandling;
@@ -433,6 +433,8 @@ impl FusedIterator for EventIter<'_> {}
 
 #[cfg(test)]
 mod tests {
+    use crate::parser::Parser;
+
     use super::Data::*;
     use super::SgmlEvent::*;
     use super::*;
@@ -503,10 +505,10 @@ mod tests {
             </HTML>
         "#;
 
-        let config = ParserConfig::builder()
+        let config = Parser::builder()
             .ignore_markup_declarations(true)
             .trim_whitespace(false)
-            .build();
+            .into_config();
         let (rest, mut events) = document_entity::<E>(SAMPLE, &config).unwrap();
         assert!(rest.is_empty(), "rest: {:?}", rest);
 
@@ -574,9 +576,9 @@ mod tests {
         );
         assert_eq!(events.next(), None);
 
-        let config = ParserConfig::builder()
+        let config = Parser::builder()
             .ignore_markup_declarations(true)
-            .build();
+            .into_config();
         let (rest, mut events) = markup_declaration::<E>(input, &config).unwrap();
         assert_eq!(rest, "<!SGML>");
         assert_eq!(events.next(), None);
@@ -596,9 +598,9 @@ mod tests {
         );
         assert_eq!(events.next(), None);
 
-        let config = ParserConfig::builder()
+        let config = Parser::builder()
             .ignore_processing_instructions(true)
-            .build();
+            .into_config();
         let (rest, mut events) = processing_instruction::<E>(input, &config).unwrap();
         assert_eq!(rest, " ");
         assert_eq!(events.next(), None);
@@ -626,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_start_tag_normalize_lowercase() {
-        let config = ParserConfig::builder().lowercase_names().build();
+        let config = Parser::builder().lowercase_names().into_config();
         let (rest, mut events) =
             start_tag::<E>("<A HREF='test.htm' \ntArget = _blank > ok", &config).unwrap();
         assert_eq!(rest, " ok");
@@ -646,7 +648,7 @@ mod tests {
 
     #[test]
     fn test_start_tag_normalize_uppercase() {
-        let config = ParserConfig::builder().uppercase_names().build();
+        let config = Parser::builder().uppercase_names().into_config();
         let (rest, mut events) =
             start_tag::<E>("<A href='test.htm' \ntArget = _blank > ok", &config).unwrap();
         assert_eq!(rest, " ok");
@@ -666,7 +668,7 @@ mod tests {
 
     #[test]
     fn test_start_tag_trim_whitespace_does_not_affect_attributes() {
-        let config = ParserConfig::builder().trim_whitespace(true).build();
+        let config = Parser::builder().trim_whitespace(true).into_config();
         let (rest, mut events) =
             start_tag::<E>("<img alt=' test ' longdesc=\" desc\">", &config).unwrap();
         assert_eq!(rest, "");
@@ -719,14 +721,14 @@ mod tests {
         );
         assert_eq!(end_tag::<E>("</>", &config), Ok(("", EndTag("".into()))));
 
-        let config = ParserConfig::builder().lowercase_names().build();
+        let config = Parser::builder().lowercase_names().into_config();
         assert_eq!(end_tag::<E>("</x>", &config), Ok(("", EndTag("x".into()))));
         assert_eq!(
             end_tag::<E>("</Foo\n>", &config),
             Ok(("", EndTag("foo".into())))
         );
 
-        let config = ParserConfig::builder().uppercase_names().build();
+        let config = Parser::builder().uppercase_names().into_config();
         assert_eq!(end_tag::<E>("</x>", &config), Ok(("", EndTag("X".into()))));
         assert_eq!(
             end_tag::<E>("</Foo\n>", &config),

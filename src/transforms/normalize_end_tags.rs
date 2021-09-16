@@ -3,7 +3,7 @@ use crate::{SgmlEvent, SgmlFragment};
 
 /// The error type in the event tag normalization fails.
 ///
-/// This is returned by [`SgmlFragment::normalize_end_tags`].
+/// This is returned by [`normalize_end_tags`].
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 pub enum NormalizationError {
     #[error("unpaired end tag: </{0}>")]
@@ -14,9 +14,61 @@ pub enum NormalizationError {
     EmptyEndTagNotSupported,
 }
 
-pub(crate) fn normalize_end_tags(
-    mut fragment: SgmlFragment,
-) -> Result<SgmlFragment, NormalizationError> {
+/// Inserts omitted end tags, assuming they are only implied for text-only content.
+///
+/// This is good enough for certain formats, like [OFX] 1.x, but not for others, e.g. [HTML].
+///
+/// # Notes
+///
+/// * Tag names are compared in a case-sensitive manner; if your data may mix cases,
+///   you can configure your parser with [`lowercase_names`] or [`uppercase_names`] beforehand.
+/// * This transform does not support empty start tags (`<>`) or empty end tags (`</>`).
+///
+/// # Example
+///
+/// Taking a fragment of (valid) OFX and inserting implied end tags:
+///
+/// ```rust
+/// # use sgmlish::transforms::normalize_end_tags;
+/// # fn main() -> sgmlish::Result<()> {
+/// let end_tags_implied = sgmlish::parse(r##"
+///     <BANKTRANLIST>
+///         <DTSTART>20210101000000[-4:GMT]
+///         <DTEND>20210201000000[-4:GMT]
+///         <STMTTRN>
+///             <TRNTYPE>DEBIT
+///             <DTPOSTED>20210114000000[-4:GMT]
+///             <TRNAMT>-12.34
+///             <FITID>F1910527-5589-4110-B55F-D257F92645B8
+///             <MEMO>Example
+///         </STMTTRN>
+///     </BANKTRANLIST>
+/// "##)?;
+///
+/// let normalized = sgmlish::parse(r##"
+///     <BANKTRANLIST>
+///         <DTSTART>20210101000000[-4:GMT]</DTSTART>
+///         <DTEND>20210201000000[-4:GMT]</DTEND>
+///         <STMTTRN>
+///             <TRNTYPE>DEBIT</TRNTYPE>
+///             <DTPOSTED>20210114000000[-4:GMT]</DTPOSTED>
+///             <TRNAMT>-12.34</TRNAMT>
+///             <FITID>F1910527-5589-4110-B55F-D257F92645B8</FITID>
+///             <MEMO>Example</MEMO>
+///         </STMTTRN>
+///     </BANKTRANLIST>
+/// "##)?;
+///
+/// assert_eq!(normalize_end_tags(end_tags_implied)?, normalized);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [OFX]: https://en.wikipedia.org/wiki/Open_Financial_Exchange
+/// [HTML]: https://en.wikipedia.org/wiki/HTML
+/// [`lowercase_names`]: crate::parser::ParserBuilder::lowercase_names
+/// [`uppercase_names`]: crate::parser::ParserBuilder::uppercase_names
+pub fn normalize_end_tags(mut fragment: SgmlFragment) -> Result<SgmlFragment, NormalizationError> {
     let mut transform = Transform::new();
     let mut stack = vec![];
     let mut next_insertion_point = fragment.len();

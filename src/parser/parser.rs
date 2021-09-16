@@ -1,13 +1,86 @@
 use std::borrow::Cow;
 use std::fmt;
 
+use nom::Finish;
+
 use crate::marked_sections::MarkedSectionStatus;
-use crate::{entities, is_sgml_whitespace, Data};
+use crate::parser::events;
+use crate::{entities, is_sgml_whitespace, Data, SgmlFragment};
 
 // Import used for documentation links
 #[allow(unused_imports)]
 use crate::SgmlEvent;
 
+use super::ParseError;
+
+/// The parser for SGML data.
+///
+/// The parser is only capable of working directly with strings,
+/// meaning the content must be decoded beforehand. If you want to work with
+/// data in character sets other than UTF-8, you may want to have a look at the
+/// [`encoding_rs`] crate.
+///
+/// [`encoding_rs`]: https://docs.rs/encoding_rs/
+#[derive(Debug)]
+pub struct Parser {
+    config: ParserConfig,
+}
+
+impl Parser {
+    /// Creates a new parser with default settings.
+    ///
+    /// The default settings are:
+    ///
+    /// * Whitespace is automatically trimmed
+    /// * Tag and attribute names are kept in original casing
+    /// * Only `CDATA` and `RCDATA` marked sections are allowed;
+    ///   `IGNORE` and `INCLUDE` blocks, for instance, are rejected,
+    ///   as are parameter entities (`%example;`) in marked sections
+    /// * Only character references (`&#33;`) are accepted; all entities (`&example;`)
+    ///   are rejected
+    /// * Markup declarations and processing instructions are preserved
+    pub fn new() -> Self {
+        Parser {
+            config: Default::default(),
+        }
+    }
+
+    /// Creates a new parser builder
+    pub fn builder() -> ParserBuilder {
+        ParserBuilder::new()
+    }
+
+    /// Parses the given input.
+    pub fn parse<'a>(&self, input: &'a str) -> crate::Result<SgmlFragment<'a>> {
+        Ok(self.parse_with_error_type(input)?)
+    }
+
+    /// Parses the given input, using a different error handler for parser errors.
+    ///
+    /// Different [`nom`] error handlers may be used to adjust between speed and
+    /// level of detail in error messages.
+    pub fn parse_with_error_type<'a, E>(
+        &self,
+        input: &'a str,
+    ) -> Result<SgmlFragment<'a>, ParseError<&'a str, E>>
+    where
+        E: nom::error::ParseError<&'a str>
+            + nom::error::ContextError<&'a str>
+            + nom::error::FromExternalError<&'a str, crate::Error>
+            + fmt::Display,
+    {
+        let (rest, events) = events::document_entity::<E>(input, &self.config)
+            .finish()
+            .map_err(|error| ParseError::from_nom(input, error))?;
+        debug_assert!(rest.is_empty(), "document_entity should be all_consuming");
+
+        let events = events.collect::<Vec<_>>();
+
+        Ok(SgmlFragment::from(events))
+    }
+}
+
+/// The configuration for a [`Parser`].
 pub struct ParserConfig {
     /// When `true`, leading and trailing whitespace from [`Character`](SgmlEvent::Character) events will be trimmed.
     /// Defaults to `true`.
@@ -95,35 +168,7 @@ impl MarkedSectionHandling {
 }
 
 impl ParserConfig {
-    /// Creates a new `ParserConfig`, with default settings.
-    ///
-    /// The default settings are:
-    ///
-    /// * Whitespace is automatically trimmed
-    /// * Tag and attribute names are kept in original casing
-    /// * Only `CDATA` and `RCDATA` marked sections are allowed;
-    ///   `IGNORE` and `INCLUDE` blocks, for instance, are rejected
-    /// * Only character references (`&#33;`) are accepted; all entities (`&example;`)
-    ///   are rejected
-    /// * Markup declarations and processing instructions are preserved
-    /// * Parameter entities (`%example;`) in marked sections are rejected
-    pub fn new() -> Self {
-        ParserConfig {
-            trim_whitespace: true,
-            name_normalization: Default::default(),
-            marked_section_handling: Default::default(),
-            ignore_markup_declarations: false,
-            ignore_processing_instructions: false,
-            entity_fn: None,
-            parameter_entity_fn: None,
-        }
-    }
-
-    /// Creates a new builder, for ease of configuration.
-    pub fn builder() -> ParserConfigBuilder {
-        ParserConfigBuilder::new()
-    }
-
+    /// Trims the given text according to the configured rules.
     pub fn trim<'a>(&self, text: &'a str) -> &'a str {
         if self.trim_whitespace {
             text.trim_matches(is_sgml_whitespace)
@@ -132,6 +177,7 @@ impl ParserConfig {
         }
     }
 
+    /// Parses the given replaceable character data, returning its final form.
     pub fn parse_rcdata<'a>(&self, rcdata: &'a str) -> crate::Result<Data<'a>> {
         let f = self.entity_fn.as_deref().unwrap_or(&|_| None);
         entities::expand_entities(rcdata, f)
@@ -139,6 +185,7 @@ impl ParserConfig {
             .map_err(From::from)
     }
 
+    /// Parses parameter entities in the given markup declaration text, returning its final form.
     pub fn parse_markup_declaration_text<'a>(
         &self,
         text: &'a str,
@@ -149,9 +196,17 @@ impl ParserConfig {
 }
 
 impl Default for ParserConfig {
-    /// Creates a new, default `ParserConfig`. See [`ParserConfig::new`] for the default settings.
+    /// Creates a new, default `ParserConfig`. See [`Parser::new`] for the default settings.
     fn default() -> Self {
-        ParserConfig::new()
+        ParserConfig {
+            trim_whitespace: true,
+            name_normalization: Default::default(),
+            marked_section_handling: Default::default(),
+            ignore_markup_declarations: false,
+            ignore_processing_instructions: false,
+            entity_fn: None,
+            parameter_entity_fn: None,
+        }
     }
 }
 
@@ -166,17 +221,20 @@ impl fmt::Debug for ParserConfig {
     }
 }
 
+/// A fluent interface for configuring parsers.
 #[derive(Default, Debug)]
-pub struct ParserConfigBuilder {
+pub struct ParserBuilder {
     config: ParserConfig,
 }
 
 /// A builder for parser configurations.
-impl ParserConfigBuilder {
+impl ParserBuilder {
+    /// Creates a new builder.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Defines whether whitespace surrounding text should be trimmed.
     pub fn trim_whitespace(mut self, trim_whitespace: bool) -> Self {
         self.config.trim_whitespace = trim_whitespace;
         self
@@ -208,7 +266,7 @@ impl ParserConfigBuilder {
         self
     }
 
-    /// Defines a closure to be used to resolve entities
+    /// Defines a closure to be used to resolve entities.
     pub fn expand_parameter_entities<F, T>(mut self, f: F) -> Self
     where
         F: Fn(&str) -> Option<T> + 'static,
@@ -232,18 +290,37 @@ impl ParserConfigBuilder {
         self.marked_section_handling(MarkedSectionHandling::ExpandAll)
     }
 
+    /// Changes whether markup declarations (`<!EXAMPLE>`) should be ignored
+    /// or present in the event stream.
     pub fn ignore_markup_declarations(mut self, ignore: bool) -> Self {
         self.config.ignore_markup_declarations = ignore;
         self
     }
 
+    /// Changes whether processing instructions (`<?example>`) should be ignored
+    /// or present in the event stream.
     pub fn ignore_processing_instructions(mut self, ignore: bool) -> Self {
         self.config.ignore_processing_instructions = ignore;
         self
     }
 
+    /// Builds a new parser from the given configuration.
+    pub fn build(self) -> Parser {
+        Parser {
+            config: self.config,
+        }
+    }
+
+    /// Parses the given input with the built parser.
+    ///
+    /// To reuse the same parser for multiple inputs, use [`build()`](ParserBuilder::build)
+    /// then [`Parser::parse()`].
+    pub fn parse(self, input: &str) -> crate::Result<SgmlFragment> {
+        self.build().parse(input)
+    }
+
     /// Returns a [`ParserConfig`] with the configuration that was built using other methods.
-    pub fn build(self) -> ParserConfig {
+    pub fn into_config(self) -> ParserConfig {
         self.config
     }
 }

@@ -5,8 +5,7 @@ use std::str::FromStr;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use sgmlish::de::DeserializationError;
-use sgmlish::parser::ParserConfig;
-use sgmlish::SgmlEvent;
+use sgmlish::{Parser, SgmlEvent};
 
 fn init_logger() {
     simple_logger::init().ok();
@@ -98,7 +97,7 @@ fn test_element_data() {
 /// * Elements are either data-only (and then closing tag is optional) or "aggregates"
 ///   (may only directly contain whitespace or other elements; closing tag mandatory)
 #[test]
-fn test_ofx() {
+fn test_ofx() -> sgmlish::Result<()> {
     init_logger();
 
     #[derive(Debug, Deserialize, PartialEq)]
@@ -178,7 +177,7 @@ fn test_ofx() {
         </BANKTRANLIST>
     "##;
 
-    let config = ParserConfig::builder()
+    let sgml = Parser::builder()
         .expand_entities(|entity| match entity {
             "lt" => Some("<"),
             "gt" => Some(">"),
@@ -186,11 +185,8 @@ fn test_ofx() {
             "nbsp" => Some(" "),
             _ => None,
         })
-        .build();
-    let sgml = sgmlish::parser::parse_with(input, &config)
-        .unwrap()
-        .normalize_end_tags()
-        .unwrap();
+        .parse(input)?;
+    let sgml = sgmlish::transforms::normalize_end_tags(sgml)?;
 
     let transaction_list = sgmlish::from_fragment::<BankTransactionList>(sgml).unwrap();
     assert_eq!(transaction_list.dtstart, "20190501");
@@ -226,10 +222,12 @@ fn test_ofx() {
     assert_eq!(trn.fitid, "3088354E-018B-41D1-ABA7-DB8F66F7B2DB");
     assert_eq!(trn.memo.as_deref(), Some("PAYMENT RECEIVED"));
     assert_eq!(trn.currency, None);
+
+    Ok(())
 }
 
 #[test]
-fn test_html_style_boolean() {
+fn test_html_style_boolean() -> sgmlish::Result<()> {
     init_logger();
 
     #[derive(Debug, Deserialize, PartialEq)]
@@ -253,12 +251,9 @@ fn test_html_style_boolean() {
         </FORM>
     "##;
 
-    let config = ParserConfig::builder().lowercase_names().build();
-    let sgml = sgmlish::parse_with(input, &config)
-        .unwrap()
-        .normalize_end_tags()
-        .unwrap();
-    let form = sgmlish::from_fragment::<Form>(sgml).unwrap();
+    let sgml = sgmlish::Parser::builder().lowercase_names().parse(input)?;
+    let sgml = sgmlish::transforms::normalize_end_tags(sgml)?;
+    let form = sgmlish::from_fragment::<Form>(sgml)?;
 
     let input1 = &form.inputs[0];
     assert!(input1.checked);
@@ -267,6 +262,8 @@ fn test_html_style_boolean() {
     let input2 = &form.inputs[1];
     assert!(!input2.checked);
     assert!(input2.disabled);
+
+    Ok(())
 }
 
 #[test]
@@ -429,7 +426,7 @@ fn test_reject_markup_declarations() {
 }
 
 #[test]
-fn test_ignore_markup_declarations() {
+fn test_ignore_markup_declarations() -> sgmlish::Result<()> {
     init_logger();
 
     #[derive(Debug, Deserialize)]
@@ -443,13 +440,14 @@ fn test_ignore_markup_declarations() {
             <name>Testing</name>
         </test>
     "##;
-    let config = ParserConfig::builder()
+    let sgml = Parser::builder()
         .ignore_markup_declarations(true)
-        .build();
-    let sgml = sgmlish::parse_with(input, &config).unwrap();
+        .parse(input)?;
 
-    let test = sgmlish::from_fragment::<Test>(sgml).unwrap();
+    let test = sgmlish::from_fragment::<Test>(sgml)?;
     assert_eq!(test.name, "Testing");
+
+    Ok(())
 }
 
 #[test]

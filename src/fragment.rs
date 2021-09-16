@@ -64,63 +64,6 @@ impl<'a> SgmlFragment<'a> {
         crate::de::from_fragment(self)
     }
 
-    /// Inserts omitted end tags, assuming they are only implied for text-only content.
-    ///
-    /// This is good enough for certain formats, like [OFX] 1.x, but not for others, e.g. [HTML].
-    ///
-    /// # Notes
-    ///
-    /// * Tag names are compared in a case-sensitive manner; if your data may mix cases,
-    ///   you can apply [`lowercase_identifiers`] or [`uppercase_identifiers`] beforehand.
-    /// * This transforms does not support empty start tags (`<>`) or empty end tags (`</>`).
-    ///
-    /// # Example
-    ///
-    /// Taking a fragment of (valid) OFX and inserting implied end tags:
-    ///
-    /// ```rust
-    /// # fn main() -> Result<(), sgmlish::Error> {
-    /// let end_tags_implied = sgmlish::parse(r##"
-    ///     <BANKTRANLIST>
-    ///         <DTSTART>20210101000000[-4:GMT]
-    ///         <DTEND>20210201000000[-4:GMT]
-    ///         <STMTTRN>
-    ///             <TRNTYPE>DEBIT
-    ///             <DTPOSTED>20210114000000[-4:GMT]
-    ///             <TRNAMT>-12.34
-    ///             <FITID>F1910527-5589-4110-B55F-D257F92645B8
-    ///             <MEMO>Example
-    ///         </STMTTRN>
-    ///     </BANKTRANLIST>
-    /// "##)?;
-    ///
-    /// let normalized = sgmlish::parse(r##"
-    ///     <BANKTRANLIST>
-    ///         <DTSTART>20210101000000[-4:GMT]</DTSTART>
-    ///         <DTEND>20210201000000[-4:GMT]</DTEND>
-    ///         <STMTTRN>
-    ///             <TRNTYPE>DEBIT</TRNTYPE>
-    ///             <DTPOSTED>20210114000000[-4:GMT]</DTPOSTED>
-    ///             <TRNAMT>-12.34</TRNAMT>
-    ///             <FITID>F1910527-5589-4110-B55F-D257F92645B8</FITID>
-    ///             <MEMO>Example</MEMO>
-    ///         </STMTTRN>
-    ///     </BANKTRANLIST>
-    /// "##)?;
-    ///
-    /// assert_eq!(end_tags_implied.normalize_end_tags()?, normalized);
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// [OFX]: https://en.wikipedia.org/wiki/Open_Financial_Exchange
-    /// [HTML]: https://en.wikipedia.org/wiki/HTML
-    /// [`lowercase_identifiers`]: SgmlFragment::lowercase_identifiers
-    /// [`uppercase_identifiers`]: SgmlFragment::uppercase_identifiers
-    pub fn normalize_end_tags(self) -> Result<Self, transforms::NormalizationError> {
-        transforms::normalize_end_tags(self)
-    }
-
     /// Calls a closure on every fragment of character data (element content and attribute value),
     /// returning a new `SgmlFragment` with the returned replacements.
     ///
