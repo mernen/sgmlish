@@ -1,3 +1,5 @@
+//! Parser combinators for spaces and comments.
+
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::character::complete::{multispace0, multispace1};
@@ -9,8 +11,12 @@ use nom::{IResult, Parser};
 
 use crate::is_sgml_whitespace;
 
-use super::raw::comment_declaration;
+use super::raw;
 
+/// Outputs all characters until the given delimiter is found,
+/// and also consumes the delimiter itself.
+///
+/// If the delimiter is not found, fails the parser, preventing recovery.
 pub fn take_until_terminated<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     ctx: &'static str,
     delimiter: &'static str,
@@ -50,16 +56,19 @@ pub fn take_until_terminated<'a, E: ParseError<&'a str> + ContextError<&'a str>>
     alt((terminated(take_until(delimiter), tag(delimiter)), fail))
 }
 
+/// Matches zero or more space characters.
 pub fn spaces<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&str, &str, E> {
     multispace0(input)
 }
 
+/// Matches zero or more comments and spaces.
 pub fn comments_and_spaces<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     input: &'a str,
 ) -> IResult<&str, &str, E> {
-    recognize(many0_count(alt((comment_declaration, multispace1))))(input)
+    recognize(many0_count(alt((raw::comment_declaration, multispace1))))(input)
 }
 
+/// Applies the given parser, then skips spaces that follow.
 pub fn strip_spaces_after<'a, O, E: ParseError<&'a str>, F>(f: F) -> impl Parser<&'a str, O, E>
 where
     F: Parser<&'a str, O, E>,
@@ -67,6 +76,7 @@ where
     terminated(f, spaces)
 }
 
+/// Skips spaces before and after the given parser.
 pub fn strip_spaces_around<'a, O, E: ParseError<&'a str>, F>(f: F) -> impl Parser<&'a str, O, E>
 where
     F: Parser<&'a str, O, E>,
@@ -74,6 +84,7 @@ where
     delimited(spaces, f, spaces)
 }
 
+/// Applies the given parser, then skips spaces and comments that follow.
 pub fn strip_comments_and_spaces_after<'a, O, E: ParseError<&'a str> + ContextError<&'a str>, F>(
     f: F,
 ) -> impl Parser<&'a str, O, E>

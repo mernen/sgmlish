@@ -1,4 +1,4 @@
-//! Matching SGML tokens and fragments and extracting key parts.
+//! Parser combinators for matching SGML tokens and fragments and extracting key parts.
 //!
 //! This is mainly based on <https://www.w3.org/MarkUp/SGML/productions.html>.
 
@@ -15,6 +15,7 @@ use crate::is_sgml_whitespace;
 
 use super::util::{spaces, strip_spaces_after, strip_spaces_around, take_until_terminated};
 
+/// Matches an entire comment declaration (`<!-- example -->`) and outputs it.
 pub fn comment_declaration<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -30,6 +31,8 @@ where
     )(input)
 }
 
+/// Matches a comment (`-- example --`) within a comment declaration or markup declaration
+/// and outputs what's between the delimiters.
 pub fn comment<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -40,6 +43,7 @@ where
     )(input)
 }
 
+/// Matches an entire markup declaration (`<!DOCTYPE example>`) and outputs it.
 pub fn markup_declaration<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -62,6 +66,7 @@ where
     )(input)
 }
 
+/// Matches `<![foo[` and outputs `foo`.
 pub fn marked_section_start_and_keyword<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -117,6 +122,7 @@ where
     }
 }
 
+/// Matches `]]>` and outputs it.
 pub fn marked_section_end<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -143,6 +149,7 @@ where
     )(input)
 }
 
+/// Matches a processing instruction (`<?example>`) and outputs it.
 pub fn processing_instruction<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -246,7 +253,7 @@ where
     tag("<>")(input)
 }
 
-/// Matches an attribute key-value pair.
+/// Matches an attribute key-value pair and outputs the key and value (without quotes).
 pub fn attribute<'a, E>(input: &'a str) -> IResult<&str, (&str, Option<&str>), E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -281,6 +288,8 @@ where
     )(input)
 }
 
+/// Matches either a [quoted](quoted_attribute_value) or
+/// [unquoted attribute value](unquoted_attribute_value).
 pub fn attribute_value<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -288,6 +297,7 @@ where
     alt((unquoted_attribute_value, quoted_attribute_value))(input)
 }
 
+/// Matches an unquoted attribute value and outputs it.
 pub fn unquoted_attribute_value<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -295,7 +305,8 @@ where
     preceded(peek(none_of("\"'")), is_not("\"'> \t\r\n"))(input)
 }
 
-fn quoted_attribute_value<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+/// Matches a quoted attribute value (`"example"` or `'example'`) and outputs its contents.
+pub fn quoted_attribute_value<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -307,6 +318,7 @@ where
     ))(input)
 }
 
+/// Matches `</foo>` and outputs `foo`.
 pub fn end_tag<'a, E>(input: &'a str) -> IResult<&str, Option<&str>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -317,6 +329,7 @@ where
     )(input)
 }
 
+/// Matches a name according to HTML4's definition.
 pub fn name<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -324,6 +337,7 @@ where
     recognize(pair(name_start, many0_count(satisfy(is_name_char))))(input)
 }
 
+/// Matches the first character of a name according to HTML4's definition.
 pub fn name_start<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -331,10 +345,12 @@ where
     recognize(satisfy(is_name_start_char))(input)
 }
 
+/// Tests whether a character is appropriate for starting a name.
 pub fn is_name_start_char(c: char) -> bool {
     c.is_alphabetic()
 }
 
+/// Tests whether a character is appropriate for continuing a name.
 pub fn is_name_char(c: char) -> bool {
     // Using LCNMCHAR and UCNMCHAR as defined by HTML4
     c.is_alphanumeric() || matches!(c, '.' | '-' | '_' | ':')

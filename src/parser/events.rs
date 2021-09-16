@@ -1,4 +1,4 @@
-//! Parsing SGML into [`SgmlEvent`]s.
+//! Higher-level parser combinators that produce [`SgmlEvent`]s.
 
 use std::borrow::Cow;
 use std::iter::{FromIterator, FusedIterator};
@@ -142,7 +142,10 @@ where
             }?;
             Ok((
                 rest,
-                EventIter::once(SgmlEvent::MarkedSection(status_keywords, content.into())),
+                EventIter::once(SgmlEvent::MarkedSection {
+                    status_keywords,
+                    section: content.into(),
+                }),
             ))
         }
         _ => match status {
@@ -188,6 +191,7 @@ where
     })(input)
 }
 
+/// Matches the content main content area of a SGML document --- one or more [`content_item`]s.
 pub fn content<'a, E>(
     input: &'a str,
     config: &ParserConfig,
@@ -205,7 +209,7 @@ where
     )(input)
 }
 
-/// Matches a single unit of content -- a tag, text data, processing instruction, or section declaration
+/// Matches a single unit of content --- a tag, text data, processing instruction, or section declaration.
 pub fn content_item<'a, E>(
     input: &'a str,
     config: &ParserConfig,
@@ -225,6 +229,7 @@ where
     ))(input)
 }
 
+/// Matches an entire start tag, and outputs a sequence of events describing it.
 pub fn start_tag<'a, E>(input: &'a str, config: &ParserConfig) -> IResult<&'a str, EventIter<'a>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
