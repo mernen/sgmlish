@@ -183,29 +183,42 @@ impl ParserConfig {
     /// Parses the given replaceable character data, returning its final form.
     pub fn parse_rcdata<'a, E>(&self, rcdata: &'a str) -> Result<Data<'a>, nom::Err<E>>
     where
-        E: nom::error::FromExternalError<&'a str, crate::Error>,
+        E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
     {
         let f = self.entity_fn.as_deref().unwrap_or(&|_| None);
         entities::expand_entities(rcdata, f)
             .map(Data::CData)
-            .map_err(|err| {
-                use nom::Slice;
-                nom::Err::Failure(E::from_external_error(
-                    rcdata.slice(err.position..),
-                    nom::error::ErrorKind::MapRes,
-                    err.into(),
-                ))
-            })
+            .map_err(|err| into_nom_failure(rcdata, err))
     }
 
     /// Parses parameter entities in the given markup declaration text, returning its final form.
-    pub fn parse_markup_declaration_text<'a>(
+    pub fn parse_markup_declaration_text<'a, E>(
         &self,
         text: &'a str,
-    ) -> entities::Result<Cow<'a, str>> {
+    ) -> Result<Cow<'a, str>, nom::Err<E>>
+    where
+        E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
+    {
         let f = self.parameter_entity_fn.as_deref().unwrap_or(&|_| None);
-        entities::expand_parameter_entities(text, f).map_err(From::from)
+        entities::expand_parameter_entities(text, f).map_err(|err| into_nom_failure(text, err))
     }
+}
+
+fn into_nom_failure<'a, E>(input: &'a str, err: entities::EntityError) -> nom::Err<E>
+where
+    E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
+{
+    use nom::Slice;
+    let slice = input.slice(err.position..);
+    nom::Err::Failure(E::add_context(
+        slice,
+        if slice.starts_with("&#") {
+            "character reference"
+        } else {
+            "entity"
+        },
+        E::from_external_error(slice, nom::error::ErrorKind::MapRes, err.into()),
+    ))
 }
 
 impl Default for ParserConfig {
