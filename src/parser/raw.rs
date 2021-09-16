@@ -62,28 +62,6 @@ where
     )(input)
 }
 
-#[deprecated]
-pub fn marked_section<'a, E>(input: &'a str) -> IResult<&str, (&str, &str), E>
-where
-    E: ParseError<&'a str> + ContextError<&'a str>,
-{
-    context(
-        "marked section",
-        preceded(
-            tag("<!["),
-            cut(tuple((
-                terminated(
-                    map(opt(is_not("[]<>!")), |s: Option<&str>| {
-                        s.unwrap_or_default().trim_matches(is_sgml_whitespace)
-                    }),
-                    char('['),
-                ),
-                take_until_terminated(r##"marked section end ("]]>")"##, "]]>"),
-            ))),
-        ),
-    )(input)
-}
-
 pub fn marked_section_start_and_keyword<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
