@@ -25,7 +25,7 @@ where
             tag("<!"),
             peek(one_of("->")),
             cut(opt(pair(comment, many0_count(pair(spaces, comment))))),
-            context(r##"close comment ("-->")"##, cut(char('>'))),
+            context(r##"comment declaration close ("-->")"##, cut(char('>'))),
         ))),
     )(input)
 }
@@ -36,7 +36,7 @@ where
 {
     preceded(
         tag("--"),
-        take_until_terminated(r##"close comment ("-->")"##, "--"),
+        take_until_terminated(r##"comment declaration close ("-->")"##, "--"),
     )(input)
 }
 
@@ -55,7 +55,7 @@ where
                 declaration_subset,
                 // Accept single "-"
                 terminated(tag("-"), not(tag("-"))),
-                is_not(">\"'[-"),
+                is_not("<>\"'[-"),
             )))),
             cut(char('>')),
         ))),
