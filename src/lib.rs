@@ -45,7 +45,10 @@ pub enum SgmlEvent<'a> {
     /// A processing instruction, e.g. `<?EXAMPLE>`
     ProcessingInstruction(Cow<'a, str>),
     /// A marked section, like `<![IGNORE[...]]>`.
-    MarkedSection(Cow<'a, str>, Cow<'a, str>),
+    MarkedSection {
+        status_keywords: Cow<'a, str>,
+        section: Cow<'a, str>,
+    },
     /// The beginning of a start-element tag, e.g. `<EXAMPLE`.
     ///
     /// Empty start-elements (`<>`) are also represented by this event,
@@ -71,9 +74,13 @@ impl<'a> SgmlEvent<'a> {
         match self {
             SgmlEvent::MarkupDeclaration(s) => SgmlEvent::MarkupDeclaration(make_owned(s)),
             SgmlEvent::ProcessingInstruction(s) => SgmlEvent::ProcessingInstruction(make_owned(s)),
-            Self::MarkedSection(status_keywords, content) => {
-                SgmlEvent::MarkedSection(make_owned(status_keywords), make_owned(content))
-            }
+            Self::MarkedSection {
+                status_keywords,
+                section,
+            } => SgmlEvent::MarkedSection {
+                status_keywords: make_owned(status_keywords),
+                section: make_owned(section),
+            },
             SgmlEvent::OpenStartTag(name) => SgmlEvent::OpenStartTag(make_owned(name)),
             SgmlEvent::Attribute(key, value) => {
                 SgmlEvent::Attribute(make_owned(key), value.map(Data::into_owned))
@@ -92,8 +99,11 @@ impl fmt::Display for SgmlEvent<'_> {
             SgmlEvent::MarkupDeclaration(decl) | SgmlEvent::ProcessingInstruction(decl) => {
                 f.write_str(decl)
             }
-            SgmlEvent::MarkedSection(status_keywords, content) => {
-                write!(f, "<![{}[{}]]>", status_keywords, content)
+            SgmlEvent::MarkedSection {
+                status_keywords,
+                section,
+            } => {
+                write!(f, "<![{}[{}]]>", status_keywords, section)
             }
             SgmlEvent::OpenStartTag(name) => write!(f, "<{}", name),
             SgmlEvent::Attribute(name, value) => {

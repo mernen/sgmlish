@@ -191,7 +191,7 @@ impl<'de> SgmlDeserializer<'de> {
         match event {
             SgmlEvent::MarkupDeclaration(_)
             | SgmlEvent::ProcessingInstruction(_)
-            | SgmlEvent::MarkedSection(..) => {
+            | SgmlEvent::MarkedSection { .. } => {
                 Err(DeserializationError::Unsupported(consume(event)))
             }
             SgmlEvent::OpenStartTag(name) | SgmlEvent::EndTag(name) if name.is_empty() => {
@@ -779,7 +779,7 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
                 }
                 SgmlEvent::ProcessingInstruction(_)
                 | SgmlEvent::MarkupDeclaration(_)
-                | SgmlEvent::MarkedSection(..) => unreachable!(),
+                | SgmlEvent::MarkedSection { .. } => unreachable!(),
             };
         }
     }

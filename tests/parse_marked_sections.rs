@@ -264,7 +264,7 @@ fn test_cdata_trim_whitespace() {
                 "            <?page break>\n",
                 "            <![RCDATA IGNORE[ four <![INCLUDE[ <BAR> five"
             )
-            .into()
+            .into(),
         )))
     );
     assert_eq!(
@@ -327,18 +327,18 @@ fn test_keep_unmodified_include_trim_whitespace() {
     );
     assert_eq!(
         events.next(),
-        Some(SgmlEvent::MarkedSection(
-            "INCLUDE".into(),
-            concat!(
+        Some(SgmlEvent::MarkedSection {
+            status_keywords: "INCLUDE".into(),
+            section: concat!(
                 " two <FOO> three\n",
                 "            <?page break>\n",
                 "            <![RCDATA IGNORE[ four <![INCLUDE[ <BAR> five ]]> ]]>\n",
                 "            <![INCLUDE[ six <BAZ PROP=\" ]]> \"> ]]>\n",
                 "            </BAZ>\n",
-                "        "
+                "        ",
             )
             .into()
-        ))
+        })
     );
     assert_eq!(
         events.next(),
@@ -346,17 +346,17 @@ fn test_keep_unmodified_include_trim_whitespace() {
     );
     assert_eq!(
         events.next(),
-        Some(SgmlEvent::MarkedSection(
-            "IGNORE".into(),
-            " eight <QUUX> nine ".into()
-        ))
+        Some(SgmlEvent::MarkedSection {
+            status_keywords: "IGNORE".into(),
+            section: " eight <QUUX> nine ".into(),
+        })
     );
     assert_eq!(
         events.next(),
-        Some(SgmlEvent::MarkedSection(
-            "TEMP RCDATA".into(),
-            " <XYZZY> <![[ ten ".into()
-        ))
+        Some(SgmlEvent::MarkedSection {
+            status_keywords: "TEMP RCDATA".into(),
+            section: " <XYZZY> <![[ ten ".into(),
+        })
     );
     assert_eq!(
         events.next(),
@@ -389,16 +389,16 @@ fn test_keep_unmodified_ignore_trim_whitespace() {
     );
     assert_eq!(
         events.next(),
-        Some(SgmlEvent::MarkedSection(
-            "IGNORE".into(),
-            concat!(
+        Some(SgmlEvent::MarkedSection {
+            status_keywords: "IGNORE".into(),
+            section: concat!(
                 " two <FOO> three\n",
                 "            <?page break>\n",
                 "            <![RCDATA IGNORE[ four <![INCLUDE[ <BAR> five ]]> ]]>\n",
                 "            <![INCLUDE[ six <BAZ PROP=\" ]]> \"> "
             )
             .into()
-        ))
+        })
     );
     assert_eq!(events.next(), Some(SgmlEvent::EndTag("BAZ".into())));
     assert_eq!(
@@ -409,17 +409,17 @@ fn test_keep_unmodified_ignore_trim_whitespace() {
     );
     assert_eq!(
         events.next(),
-        Some(SgmlEvent::MarkedSection(
-            "IGNORE".into(),
-            " eight <QUUX> nine ".into()
-        ))
+        Some(SgmlEvent::MarkedSection {
+            status_keywords: "IGNORE".into(),
+            section: " eight <QUUX> nine ".into()
+        })
     );
     assert_eq!(
         events.next(),
-        Some(SgmlEvent::MarkedSection(
-            "TEMP RCDATA".into(),
-            " <XYZZY> <![[ ten ".into()
-        ))
+        Some(SgmlEvent::MarkedSection {
+            status_keywords: "TEMP RCDATA".into(),
+            section: " <XYZZY> <![[ ten ".into()
+        })
     );
     assert_eq!(
         events.next(),
