@@ -189,8 +189,11 @@ impl<'de> SgmlDeserializer<'de> {
             None => return Ok(()),
         };
         match event {
-            SgmlEvent::MarkupDeclaration(_) | SgmlEvent::ProcessingInstruction(_) => self.advance(),
-            SgmlEvent::MarkedSection(..) => Err(DeserializationError::Unsupported(consume(event))),
+            SgmlEvent::MarkupDeclaration(_)
+            | SgmlEvent::ProcessingInstruction(_)
+            | SgmlEvent::MarkedSection(..) => {
+                Err(DeserializationError::Unsupported(consume(event)))
+            }
             SgmlEvent::OpenStartTag(name) | SgmlEvent::EndTag(name) if name.is_empty() => {
                 Err(DeserializationError::Unsupported(consume(event)))
             }

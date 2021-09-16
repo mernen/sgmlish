@@ -15,6 +15,8 @@ pub struct ParserConfig {
     /// Defines how tag and attribute names should be handled.
     pub name_normalization: NameNormalization,
     pub marked_section_handling: MarkedSectionHandling,
+    pub ignore_markup_declarations: bool,
+    pub ignore_processing_instructions: bool,
     entity_fn: Option<EntityFn>,
     parameter_entity_fn: Option<EntityFn>,
 }
@@ -98,17 +100,20 @@ impl ParserConfig {
     /// The default settings are:
     ///
     /// * Whitespace is automatically trimmed
-    /// * Tag and attribute names are kept in original form
+    /// * Tag and attribute names are kept in original casing
     /// * Only `CDATA` and `RCDATA` marked sections are allowed;
     ///   `IGNORE` and `INCLUDE` blocks, for instance, are rejected
     /// * Only character references (`&#33;`) are accepted; all entities (`&example;`)
     ///   are rejected
+    /// * Markup declarations and processing instructions are preserved
     /// * Parameter entities (`%example;`) in marked sections are rejected
     pub fn new() -> Self {
         ParserConfig {
             trim_whitespace: true,
             name_normalization: Default::default(),
             marked_section_handling: Default::default(),
+            ignore_markup_declarations: false,
+            ignore_processing_instructions: false,
             entity_fn: None,
             parameter_entity_fn: None,
         }
@@ -172,6 +177,11 @@ impl ParserConfigBuilder {
         Default::default()
     }
 
+    pub fn trim_whitespace(mut self, trim_whitespace: bool) -> Self {
+        self.config.trim_whitespace = trim_whitespace;
+        self
+    }
+
     /// Defines how tag and attribute names should be normalized.
     pub fn name_normalization(mut self, name_normalization: NameNormalization) -> Self {
         self.config.name_normalization = name_normalization;
@@ -208,6 +218,7 @@ impl ParserConfigBuilder {
         self
     }
 
+    /// Changes how marked sections should be handled.
     pub fn marked_section_handling(mut self, mode: MarkedSectionHandling) -> Self {
         self.config.marked_section_handling = mode;
         self
@@ -221,8 +232,13 @@ impl ParserConfigBuilder {
         self.marked_section_handling(MarkedSectionHandling::ExpandAll)
     }
 
-    pub fn trim_whitespace(mut self, trim_whitespace: bool) -> Self {
-        self.config.trim_whitespace = trim_whitespace;
+    pub fn ignore_markup_declarations(mut self, ignore: bool) -> Self {
+        self.config.ignore_markup_declarations = ignore;
+        self
+    }
+
+    pub fn ignore_processing_instructions(mut self, ignore: bool) -> Self {
+        self.config.ignore_processing_instructions = ignore;
         self
     }
 

@@ -34,10 +34,15 @@ where
                 "document content",
                 cut(|input| content(input, config, MarkedSectionEndHandling::TreatAsText)),
             ),
-            many0(strip_comments_and_spaces_after(processing_instruction)),
+            many0(strip_comments_and_spaces_after(|input| {
+                processing_instruction(input, config)
+            })),
         )),
         |(_, declarations, content, epilogue)| {
-            declarations.into_iter().chain(content).chain(epilogue)
+            declarations
+                .into_iter()
+                .chain(content)
+                .chain(epilogue.into_iter().flatten())
         },
     ))(input)
 }
@@ -53,21 +58,26 @@ where
         "prolog",
         map(
             many0(strip_comments_and_spaces_after(alt((
-                map(markup_declaration, EventIter::once),
+                |input| markup_declaration(input, config),
                 |input| marked_section(input, config),
-                map(processing_instruction, EventIter::once),
+                |input| processing_instruction(input, config),
             )))),
             |events| events.into_iter().flatten().collect(),
         ),
     )(input)
 }
 
-pub fn markup_declaration<'a, E>(input: &'a str) -> IResult<&'a str, SgmlEvent<'a>, E>
+pub fn markup_declaration<'a, E>(
+    input: &'a str,
+    config: &ParserConfig,
+) -> IResult<&'a str, EventIter<'a>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     map(raw::markup_declaration, |s| {
-        SgmlEvent::MarkupDeclaration(Cow::from(s))
+        EventIter::cond(!config.ignore_markup_declarations, || {
+            SgmlEvent::MarkupDeclaration(Cow::from(s))
+        })
     })(input)
 }
 
@@ -144,12 +154,17 @@ where
     }
 }
 
-pub fn processing_instruction<'a, E>(input: &'a str) -> IResult<&'a str, SgmlEvent<'a>, E>
+pub fn processing_instruction<'a, E>(
+    input: &'a str,
+    config: &ParserConfig,
+) -> IResult<&'a str, EventIter<'a>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     map(raw::processing_instruction, |s| {
-        SgmlEvent::ProcessingInstruction(Cow::from(s))
+        EventIter::cond(!config.ignore_processing_instructions, || {
+            SgmlEvent::ProcessingInstruction(Cow::from(s))
+        })
     })(input)
 }
 
@@ -180,16 +195,10 @@ where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
 {
     alt((
-        map(
-            |input| text(input, config, mse),
-            |event| match event {
-                Some(event) => EventIter::once(event),
-                None => EventIter::empty(),
-            },
-        ),
+        |input| text(input, config, mse),
         |input| start_tag(input, config),
         map(|input| end_tag(input, config), EventIter::once),
-        map(processing_instruction, EventIter::once),
+        |input| processing_instruction(input, config),
         |input| marked_section(input, config),
         // When all else fails, sinalize we expected at least opening a tag
         |input| Err(nom::Err::Error(E::from_char(input, '<'))),
@@ -287,7 +296,7 @@ pub fn text<'a, E>(
     input: &'a str,
     config: &ParserConfig,
     mse: MarkedSectionEndHandling,
-) -> IResult<&'a str, Option<SgmlEvent<'a>>, E>
+) -> IResult<&'a str, EventIter<'a>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
 {
@@ -296,9 +305,11 @@ where
         |s| {
             let s = config.trim(s);
             if s.is_empty() {
-                return Ok(None);
+                return Ok(EventIter::empty());
             }
-            Ok(Some(SgmlEvent::Character(config.parse_rcdata(s)?)))
+            Ok(EventIter::once(SgmlEvent::Character(
+                config.parse_rcdata(s)?,
+            )))
         },
     )(input)
 }
@@ -316,7 +327,7 @@ pub struct EventIter<'a> {
 }
 
 impl<'a> EventIter<'a> {
-    fn empty() -> Self {
+    const fn empty() -> Self {
         EventIter {
             start: None,
             middle: Vec::new(),
@@ -331,6 +342,14 @@ impl<'a> EventIter<'a> {
             middle: Vec::new(),
             end: None,
             middle_next: 0,
+        }
+    }
+
+    fn cond(condition: bool, event: impl FnOnce() -> SgmlEvent<'a>) -> Self {
+        if condition {
+            EventIter::once(event())
+        } else {
+            EventIter::empty()
         }
     }
 
@@ -470,7 +489,7 @@ mod tests {
     }
 
     #[test]
-    fn test_document_entity_retain_whitespace() {
+    fn test_document_entity_ignore_markup_declarations_retain_whitespace() {
         const SAMPLE: &str = r#"
             <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
                 "http://www.w3.org/TR/html4/strict.dtd">
@@ -483,17 +502,13 @@ mod tests {
                 </BODY>
             </HTML>
         "#;
-        let config = ParserConfig::builder().trim_whitespace(false).build();
+
+        let config = ParserConfig::builder()
+            .ignore_markup_declarations(true)
+            .trim_whitespace(false)
+            .build();
         let (rest, mut events) = document_entity::<E>(SAMPLE, &config).unwrap();
         assert!(rest.is_empty(), "rest: {:?}", rest);
-
-        assert_eq!(
-            events.next(),
-            Some(MarkupDeclaration(
-                "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\"\n                \"http://www.w3.org/TR/html4/strict.dtd\">"
-                    .into()
-            ))
-        );
 
         assert_eq!(events.next(), Some(OpenStartTag("HTML".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
@@ -545,6 +560,48 @@ mod tests {
         );
         assert_eq!(events.next(), Some(EndTag("HTML".into())));
         assert_eq!(events.next(), Some(Character(CData("\n        ".into()))));
+    }
+
+    #[test]
+    fn test_markup_declaration() {
+        let input = r##"<!DOCTYPE HTML><!SGML>"##;
+
+        let (rest, mut events) = markup_declaration::<E>(input, &Default::default()).unwrap();
+        assert_eq!(rest, "<!SGML>");
+        assert_eq!(
+            events.next(),
+            Some(SgmlEvent::MarkupDeclaration(r##"<!DOCTYPE HTML>"##.into()))
+        );
+        assert_eq!(events.next(), None);
+
+        let config = ParserConfig::builder()
+            .ignore_markup_declarations(true)
+            .build();
+        let (rest, mut events) = markup_declaration::<E>(input, &config).unwrap();
+        assert_eq!(rest, "<!SGML>");
+        assert_eq!(events.next(), None);
+    }
+
+    #[test]
+    fn test_processing_instruction() {
+        let input = r##"<?experiment> "##;
+
+        let (rest, mut events) = processing_instruction::<E>(input, &Default::default()).unwrap();
+        assert_eq!(rest, " ");
+        assert_eq!(
+            events.next(),
+            Some(SgmlEvent::ProcessingInstruction(
+                r##"<?experiment>"##.into()
+            ))
+        );
+        assert_eq!(events.next(), None);
+
+        let config = ParserConfig::builder()
+            .ignore_processing_instructions(true)
+            .build();
+        let (rest, mut events) = processing_instruction::<E>(input, &config).unwrap();
+        assert_eq!(rest, " ");
+        assert_eq!(events.next(), None);
     }
 
     #[test]

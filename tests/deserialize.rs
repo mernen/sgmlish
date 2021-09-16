@@ -4,7 +4,9 @@ use std::str::FromStr;
 
 use rust_decimal::Decimal;
 use serde::Deserialize;
+use sgmlish::de::DeserializationError;
 use sgmlish::parser::ParserConfig;
+use sgmlish::SgmlEvent;
 
 fn init_logger() {
     simple_logger::init().ok();
@@ -400,4 +402,77 @@ fn test_sequence_of_tuples() {
     };
 
     assert_eq!(expected, sgmlish::from_fragment(sgml).unwrap());
+}
+
+#[test]
+fn test_reject_markup_declarations() {
+    init_logger();
+
+    #[derive(Debug, Deserialize)]
+    struct Test {
+        name: String,
+    }
+
+    let input = r##"
+        <!DOCTYPE test>
+        <test>
+            <name>Testing</name>
+        </test>
+    "##;
+    let sgml = sgmlish::parse(input).unwrap();
+
+    let err = sgmlish::from_fragment::<Test>(sgml).unwrap_err();
+    assert!(matches!(
+        err,
+        DeserializationError::Unsupported(SgmlEvent::MarkupDeclaration(md)) if md == "<!DOCTYPE test>"
+    ));
+}
+
+#[test]
+fn test_ignore_markup_declarations() {
+    init_logger();
+
+    #[derive(Debug, Deserialize)]
+    struct Test {
+        name: String,
+    }
+
+    let input = r##"
+        <!DOCTYPE test>
+        <test>
+            <name>Testing</name>
+        </test>
+    "##;
+    let config = ParserConfig::builder()
+        .ignore_markup_declarations(true)
+        .build();
+    let sgml = sgmlish::parse_with(input, &config).unwrap();
+
+    let test = sgmlish::from_fragment::<Test>(sgml).unwrap();
+    assert_eq!(test.name, "Testing");
+}
+
+#[test]
+fn test_reject_processing_instructions() {
+    init_logger();
+
+    #[derive(Debug, Deserialize)]
+    struct Test {
+        name: String,
+    }
+
+    let input = r##"
+        <test>
+            <?experiment>
+                <name>Testing</name>
+            <?/experiment>
+        </test>
+    "##;
+    let sgml = sgmlish::parse(input).unwrap();
+
+    let err = sgmlish::from_fragment::<Test>(sgml).unwrap_err();
+    assert!(matches!(
+        err,
+        DeserializationError::Unsupported(SgmlEvent::ProcessingInstruction(pi)) if pi == "<?experiment>"
+    ));
 }
