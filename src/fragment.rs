@@ -1,9 +1,6 @@
 use std::fmt::{self, Write};
 
-use never::Never;
-
-use crate::transforms::MapDataResult;
-use crate::{entities, transforms, Data, SgmlEvent};
+use crate::SgmlEvent;
 
 /// A list of events from a parsed SGML document.
 ///
@@ -62,125 +59,6 @@ impl<'a> SgmlFragment<'a> {
         T: serde::Deserialize<'a>,
     {
         crate::de::from_fragment(self)
-    }
-
-    /// Calls a closure on every fragment of character data (element content and attribute value),
-    /// returning a new `SgmlFragment` with the returned replacements.
-    ///
-    /// The closure receives two parameters: the data fragment,
-    /// and the attribute name (or `None` in case of element content).
-    /// The return value of the closure can be either [`Data`] or `Option<Data>`,
-    /// in case filtering is desired.
-    ///
-    /// For a version where the closure may return an error, see [`try_map_data`].
-    ///
-    /// [`try_map_data`]: SgmlFragment::try_map_data
-    pub fn map_data<F, R>(self, f: F) -> Self
-    where
-        F: FnMut(Data<'a>, Option<&str>) -> R,
-        R: Into<MapDataResult<'a, Never>>,
-    {
-        transforms::try_map_data(self, f).unwrap_or_else(|_| unreachable!())
-    }
-
-    /// Calls a closure on every fragment of character data (element content and attribute value),
-    /// returning a new [`SgmlFragment`] with the returned replacements.
-    ///
-    /// The closure receives two parameters: the data fragment,
-    /// and the attribute name (or `None` in case of element content).
-    /// The return value of the closure can be either `Result<Data, E>`
-    /// or `Result<Option<Data>, E>`, in case filtering is desired.
-    ///
-    /// For a version where error results are not needed, see [`map_data`].
-    ///
-    /// [`map_data`]: SgmlFragment::map_data
-    pub fn try_map_data<F, R, E>(self, f: F) -> Result<Self, E>
-    where
-        F: FnMut(Data<'a>, Option<&str>) -> R,
-        R: Into<MapDataResult<'a, E>>,
-    {
-        transforms::try_map_data(self, f)
-    }
-
-    /// Expands character references (`&#123;`) in the content.
-    /// Any entity references are treated as errors.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use sgmlish::{CData, RcData, SgmlEvent};
-    /// # fn main() -> Result<(), sgmlish::Error> {
-    /// let sgml = sgmlish::parse(
-    ///     "\
-    ///     <example>\
-    ///         This is an &#60;example&#62; element\
-    ///     </example>\
-    ///     ",
-    /// )?;
-    /// // We start with unexpanded replaceable character data (RcData)
-    /// assert_eq!(
-    ///     sgml.as_slice()[2],
-    ///     SgmlEvent::Character(RcData("This is an &#60;example&#62; element".into()))
-    /// );
-    ///
-    /// let expanded = sgml.expand_character_references()?;
-    /// // The expanded form is now character data (CData)
-    /// assert_eq!(
-    ///     expanded.as_slice()[2],
-    ///     SgmlEvent::Character(CData("This is an <example> element".into()))
-    /// );
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn expand_character_references(self) -> entities::Result<Self> {
-        self.try_map_data(|text, _key| text.expand_character_references())
-    }
-
-    /// Expands entity references (`&foo;`) as well as character references (`&#123;`)
-    /// in the content.
-    ///
-    /// The given closure is called to expand each entity found. Fails if the closure returns `None`.
-    /// Character references (`&#123;`) are expanded without going through the closure.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # use std::collections::HashMap;
-    /// # use sgmlish::{CData, RcData, SgmlEvent};
-    /// # fn main() -> Result<(), sgmlish::Error> {
-    /// let mut entities = HashMap::new();
-    /// entities.insert("lt", "<");
-    /// entities.insert("gt", ">");
-    /// entities.insert("amp", "&");
-    ///
-    /// let sgml = sgmlish::parse(
-    ///     "\
-    ///     <example>\
-    ///         This is an &lt;example&gt; element\
-    ///     </example>\
-    ///     ",
-    /// )?;
-    /// // We start with unexpanded replaceable character data (RcData)
-    /// assert_eq!(
-    ///     sgml.as_slice()[2],
-    ///     SgmlEvent::Character(RcData("This is an &lt;example&gt; element".into()))
-    /// );
-    ///
-    /// let expanded = sgml.expand_entities(|entity| entities.get(entity))?;
-    /// // The expanded form is now character data (CData)
-    /// assert_eq!(
-    ///     expanded.as_slice()[2],
-    ///     SgmlEvent::Character(CData("This is an <example> element".into()))
-    /// );
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn expand_entities<F, T>(self, mut f: F) -> entities::Result<Self>
-    where
-        F: FnMut(&str) -> Option<T>,
-        T: AsRef<str>,
-    {
-        self.try_map_data(|text, _key| text.expand_entities(&mut f))
     }
 }
 

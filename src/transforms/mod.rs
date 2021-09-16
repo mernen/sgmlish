@@ -4,10 +4,8 @@
 //!
 //! [`SgmlFragment`]: crate::SgmlFragment
 
-pub use self::data::*;
 pub use self::helper::*;
 pub use self::normalize_end_tags::*;
 
-mod data;
 mod helper;
 mod normalize_end_tags;
