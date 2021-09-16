@@ -178,11 +178,21 @@ impl ParserConfig {
     }
 
     /// Parses the given replaceable character data, returning its final form.
-    pub fn parse_rcdata<'a>(&self, rcdata: &'a str) -> crate::Result<Data<'a>> {
+    pub fn parse_rcdata<'a, E>(&self, rcdata: &'a str) -> Result<Data<'a>, nom::Err<E>>
+    where
+        E: nom::error::FromExternalError<&'a str, crate::Error>,
+    {
         let f = self.entity_fn.as_deref().unwrap_or(&|_| None);
         entities::expand_entities(rcdata, f)
             .map(Data::CData)
-            .map_err(From::from)
+            .map_err(|err| {
+                use nom::Slice;
+                nom::Err::Failure(E::from_external_error(
+                    rcdata.slice(err.position..),
+                    nom::error::ErrorKind::MapRes,
+                    err.into(),
+                ))
+            })
     }
 
     /// Parses parameter entities in the given markup declaration text, returning its final form.

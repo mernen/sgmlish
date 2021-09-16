@@ -5,7 +5,7 @@ use std::iter::{FromIterator, FusedIterator};
 use std::{fmt, mem};
 
 use nom::branch::alt;
-use nom::combinator::{all_consuming, cut, map, map_res, recognize, value};
+use nom::combinator::{all_consuming, cut, map, recognize, value};
 use nom::error::{context, ContextError, ErrorKind, FromExternalError, ParseError};
 use nom::multi::{many0, many0_count, many1};
 use nom::sequence::{terminated, tuple};
@@ -138,11 +138,15 @@ where
                     config.trim(content).into(),
                 )))
             })(rest),
-            MarkedSectionStatus::RcData => map_res(raw::marked_section_body_character, |content| {
-                Ok(EventIter::once(SgmlEvent::Character(
-                    config.parse_rcdata(config.trim(content))?,
-                )))
-            })(rest),
+            MarkedSectionStatus::RcData => {
+                let (rest, content) = raw::marked_section_body_character(rest)?;
+                Ok((
+                    rest,
+                    EventIter::once(SgmlEvent::Character(
+                        config.parse_rcdata(config.trim(content))?,
+                    )),
+                ))
+            }
             MarkedSectionStatus::Include => terminated(
                 map(
                     |input| content(input, config, MarkedSectionEndHandling::StopParsing),
@@ -271,12 +275,10 @@ pub fn attribute<'a, E>(input: &'a str, config: &ParserConfig) -> IResult<&'a st
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
 {
-    map_res(raw::attribute, |(key, value)| {
-        Ok(SgmlEvent::Attribute(
-            config.name_normalization.normalize(key.into()),
-            value.map(|value| config.parse_rcdata(value)).transpose()?,
-        ))
-    })(input)
+    map(
+        |input| raw::attribute_parse_value(input, |value| config.parse_rcdata(value)),
+        |(key, value)| SgmlEvent::Attribute(config.name_normalization.normalize(key.into()), value),
+    )(input)
 }
 
 fn end_tag<'a, E>(input: &'a str, config: &ParserConfig) -> IResult<&'a str, SgmlEvent<'a>, E>
@@ -300,18 +302,15 @@ pub fn text<'a, E>(
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
 {
-    map_res(
-        |input| raw::text(input, mse),
-        |s| {
-            let s = config.trim(s);
-            if s.is_empty() {
-                return Ok(EventIter::empty());
-            }
-            Ok(EventIter::once(SgmlEvent::Character(
-                config.parse_rcdata(s)?,
-            )))
-        },
-    )(input)
+    let (rest, text) = raw::text(input, mse)?;
+    let s = config.trim(text);
+    if s.is_empty() {
+        return Ok((rest, EventIter::empty()));
+    }
+    Ok((
+        rest,
+        EventIter::once(SgmlEvent::Character(config.parse_rcdata(s)?)),
+    ))
 }
 
 /// An iterator over a sequence of events.

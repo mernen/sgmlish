@@ -6,7 +6,7 @@ use std::char;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{digit1, hex_digit1};
-use nom::combinator::{map, map_opt, opt, recognize};
+use nom::combinator::{consumed, map, opt, recognize};
 use nom::sequence::{preceded, terminated};
 use nom::IResult;
 
@@ -20,8 +20,13 @@ pub type Result<T = ()> = std::result::Result<T, EntityError>;
 /// That means the entity expansion closure was called, and it returned `None`.
 /// When invoking [`expand_character_references`], any entity reference is considered undefined.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
-#[error("entity '{0}' is not defined")]
-pub struct EntityError(String);
+#[error("entity '{entity}' is not defined (in position {position})")]
+pub struct EntityError {
+    /// The name of the entity that was not found.
+    pub entity: String,
+    /// The byte offset of the entity in the source string.
+    pub position: usize,
+}
 
 /// Expands character references (`&#123;`) in the given text.
 /// Any entity references are treated as errors.
@@ -91,40 +96,44 @@ where
     F: FnMut(&str) -> Option<T>,
     T: AsRef<str>,
 {
-    let mut parts = text.split(prefix);
-
-    let first = parts.next().unwrap();
-    if first.len() == text.len() {
-        return Ok(text.into());
-    }
-
+    let mut rest = text;
     let mut out = String::new();
-    out.push_str(first);
 
     // Suffix the matcher with optional `;`
     let mut matcher = terminated(matcher, opt(tag(";")));
 
-    for part in parts {
-        match matcher(part) {
-            Ok((rest, EntityRef::Entity(name))) => {
+    while let Some(next_prefix) = rest.find(prefix) {
+        let (intermezzo, candidate) = rest.split_at(next_prefix);
+        out.push_str(intermezzo);
+        match matcher(&candidate[1..]) {
+            Ok((remainder, EntityRef::Entity(name))) => {
                 out.push_str(
                     f(name)
-                        .ok_or_else(|| EntityError(name.to_owned()))?
+                        .ok_or_else(|| EntityError {
+                            entity: name.to_owned(),
+                            position: text.len() - candidate.len(),
+                        })?
                         .as_ref(),
                 );
-                out.push_str(rest);
+                rest = remainder;
             }
-            Ok((rest, EntityRef::Char(c))) => {
+            Ok((remainder, EntityRef::Char(c))) => {
                 out.push(c);
-                out.push_str(rest);
+                rest = remainder;
             }
             Err(_) => {
-                out.push(prefix);
-                out.push_str(part)
+                let (c, remainder) = candidate.split_at(1);
+                out.push_str(c);
+                rest = remainder;
             }
         }
     }
 
+    if rest.len() == text.len() {
+        return Ok(text.into());
+    }
+
+    out.push_str(rest);
     Ok(out.into())
 }
 
@@ -133,8 +142,8 @@ fn entity_or_char_ref(input: &str) -> IResult<&str, EntityRef> {
 }
 
 fn char_ref(input: &str) -> IResult<&str, EntityRef> {
-    map_opt(
-        preceded(
+    map(
+        consumed(preceded(
             tag("#"),
             alt((
                 map(digit1, |code: &str| code.parse().ok()),
@@ -144,8 +153,12 @@ fn char_ref(input: &str) -> IResult<&str, EntityRef> {
                     map(hex_digit1, |code| u32::from_str_radix(code, 16).ok()),
                 ),
             )),
-        ),
-        |code| code.and_then(char::from_u32).map(EntityRef::Char),
+        )),
+        |(raw, code)| {
+            code.and_then(char::from_u32)
+                .map(EntityRef::Char)
+                .unwrap_or_else(|| EntityRef::Entity(raw))
+        },
     )(input)
 }
 
@@ -182,7 +195,13 @@ mod tests {
     #[test]
     fn test_invalid_character_ref() {
         let result = expand_character_references("foo&#x110000;bar");
-        assert_eq!(result, Err(EntityError("#x110000".to_owned())));
+        assert_eq!(
+            result,
+            Err(EntityError {
+                entity: "#x110000".to_owned(),
+                position: 3,
+            })
+        );
     }
 
     #[test]
@@ -218,12 +237,11 @@ mod tests {
     }
 
     #[test]
-    fn test_expand_entities_delegates_invalid_hex_char_refs_to_closure() {
-        let result = expand_entities("test &#x12345678 ok", |key| {
-            assert_eq!(key, "#x12345678");
-            Some("XYZ")
+    fn test_expand_entities_delegates_invalid_char_refs_to_closure() {
+        let result = expand_entities("test &#12345678&#x12345678 ok", |key| {
+            Some(format!("({})", key))
         });
-        assert_eq!(result, Ok("test XYZ ok".into()));
+        assert_eq!(result, Ok("test (#12345678)(#x12345678) ok".into()));
     }
 
     #[test]
@@ -233,7 +251,13 @@ mod tests {
             "bar" => None,
             x => panic!("unexpected reference: {:?}", x),
         });
-        assert_eq!(result, Err(EntityError("bar".into())));
+        assert_eq!(
+            result,
+            Err(EntityError {
+                entity: "bar".into(),
+                position: 10,
+            })
+        );
     }
 
     #[test]
@@ -245,7 +269,13 @@ mod tests {
             None::<&str>
         });
         assert!(called);
-        assert_eq!(result, Err(EntityError("#test".into())));
+        assert_eq!(
+            result,
+            Err(EntityError {
+                entity: "#test".into(),
+                position: 3,
+            })
+        );
     }
 
     #[test]
