@@ -59,7 +59,7 @@ where
         map(
             many0(strip_comments_and_spaces_after(alt((
                 |input| markup_declaration(input, config),
-                |input| marked_section(input, config),
+                |input| marked_section_declaration(input, config),
                 |input| processing_instruction(input, config),
             )))),
             |events| events.into_iter().flatten().collect(),
@@ -81,48 +81,64 @@ where
     })(input)
 }
 
-pub fn marked_section<'a, E>(
+pub fn marked_section_declaration<'a, E>(
     input: &'a str,
     config: &ParserConfig,
 ) -> IResult<&'a str, EventIter<'a>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
 {
-    let (rest, status_keywords) = raw::marked_section_start(input)?;
-    let status_keywords = config
-        .parse_markup_declaration_text(status_keywords)
-        .map_err(|err| {
-            nom::Err::Failure(E::from_external_error(
-                input,
-                ErrorKind::Tag,
-                Error::EntityError(err),
-            ))
-        })?;
+    context("marked section declaration", |input| {
+        let (rest, raw_status_keywords) = raw::marked_section_start_and_keyword(input)?;
+        let status_keywords = config.parse_markup_declaration_text(raw_status_keywords)?;
 
+        let status = match config
+            .marked_section_handling
+            .parse_keywords(&status_keywords)
+        {
+            Ok(status) => status,
+            Err(keyword) => {
+                use nom::{FindSubstring, Slice};
+                let pos = raw_status_keywords
+                    .find_substring(keyword)
+                    .map(|pos| raw_status_keywords.slice(pos..))
+                    // There's no match if the keyword came from a parameter entity expansion
+                    .unwrap_or(raw_status_keywords);
+                return Err(nom::Err::Failure(E::from_external_error(
+                    pos,
+                    ErrorKind::Tag,
+                    Error::InvalidMarkedSectionKeyword(status_keywords.into_owned()),
+                )));
+            }
+        };
+
+        marked_section_body(rest, status_keywords, status, config)
+    })(input)
+}
+
+pub fn marked_section_body<'a, E>(
+    input: &'a str,
+    status_keywords: Cow<'a, str>,
+    status: MarkedSectionStatus,
+    config: &ParserConfig,
+) -> IResult<&'a str, EventIter<'a>, E>
+where
+    E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
+{
     let marked_section_handling = config.marked_section_handling;
-    let status = match marked_section_handling.parse_keywords(&status_keywords) {
-        Some(status) => status,
-        None => {
-            return Err(nom::Err::Failure(E::from_external_error(
-                input,
-                ErrorKind::Tag,
-                Error::InvalidMarkedSectionKeyword(status_keywords.into_owned()),
-            )));
-        }
-    };
 
     match marked_section_handling {
         MarkedSectionHandling::KeepUnmodified => {
             let (rest, content) = match status {
-                MarkedSectionStatus::Ignore => raw::marked_section_body_ignore(rest),
-                MarkedSectionStatus::CData => raw::marked_section_body_character(rest),
-                MarkedSectionStatus::RcData => raw::marked_section_body_character(rest),
+                MarkedSectionStatus::Ignore => raw::marked_section_body_ignore(input),
+                MarkedSectionStatus::CData => raw::marked_section_body_character(input),
+                MarkedSectionStatus::RcData => raw::marked_section_body_character(input),
                 MarkedSectionStatus::Include => terminated(
                     recognize(|input| {
                         content(input, config, MarkedSectionEndHandling::StopParsing)
                     }),
                     raw::marked_section_end,
-                )(rest),
+                )(input),
             }?;
             Ok((
                 rest,
@@ -131,15 +147,15 @@ where
         }
         _ => match status {
             MarkedSectionStatus::Ignore => {
-                map(raw::marked_section_body_ignore, |_| EventIter::empty())(rest)
+                map(raw::marked_section_body_ignore, |_| EventIter::empty())(input)
             }
             MarkedSectionStatus::CData => map(raw::marked_section_body_character, |content| {
                 EventIter::once(SgmlEvent::Character(Data::CData(
                     config.trim(content).into(),
                 )))
-            })(rest),
+            })(input),
             MarkedSectionStatus::RcData => {
-                let (rest, content) = raw::marked_section_body_character(rest)?;
+                let (rest, content) = raw::marked_section_body_character(input)?;
                 Ok((
                     rest,
                     EventIter::once(SgmlEvent::Character(
@@ -152,8 +168,8 @@ where
                     |input| content(input, config, MarkedSectionEndHandling::StopParsing),
                     EventIter::from_iter,
                 ),
-                raw::marked_section_end,
-            )(rest),
+                raw::marked_section_body_character_data,
+            )(input),
         },
     }
 }
@@ -203,7 +219,7 @@ where
         |input| start_tag(input, config),
         map(|input| end_tag(input, config), EventIter::once),
         |input| processing_instruction(input, config),
-        |input| marked_section(input, config),
+        |input| marked_section_declaration(input, config),
         // When all else fails, sinalize we expected at least opening a tag
         |input| Err(nom::Err::Error(E::from_char(input, '<'))),
     ))(input)

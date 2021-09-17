@@ -3,7 +3,7 @@
 //! This is mainly based on <https://www.w3.org/MarkUp/SGML/productions.html>.
 
 use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag};
+use nom::bytes::complete::{is_not, tag, take_till};
 use nom::character::complete::{char, none_of, one_of, satisfy};
 use nom::combinator::{cut, map, map_parser, not, opt, peek, recognize, verify};
 use nom::error::{context, ContextError, ErrorKind, ParseError};
@@ -84,36 +84,33 @@ where
     )(input)
 }
 
-pub fn marked_section_start<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn marked_section_start_and_keyword<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    context(
-        "marked section start",
-        preceded(
-            tag("<!["),
-            cut(terminated(
-                map(opt(is_not("[]<>!")), |s: Option<&str>| {
-                    s.unwrap_or_default().trim_matches(is_sgml_whitespace)
-                }),
-                char('['),
-            )),
-        ),
+    preceded(
+        tag("<!["),
+        cut(terminated(
+            map(
+                take_till(|c| matches!(c, '[' | ']' | '<' | '>' | '!')),
+                |s: &str| s.trim_matches(is_sgml_whitespace),
+            ),
+            char('['),
+        )),
     )(input)
 }
 
-/// Matches the content for `CDATA` and `RCDATA` marked sections, immediately after [`marked_section_start`].
+/// Matches the content for `CDATA` and `RCDATA` marked sections, immediately after [`marked_section_start_and_keyword`].
 ///
 /// These sections do nest, meaning they end on the first `]]>` found.
 pub fn marked_section_body_character<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    use nom::Parser;
-    take_until_terminated(r##"marked section end ("]]>")"##, "]]>").parse(input)
+    take_until_terminated(r##"marked section end ("]]>")"##, "]]>")(input)
 }
 
-/// Matches the content for `IGNORE` marked sections, immediately after [`marked_section_start`].
+/// Matches the content for `IGNORE` marked sections, immediately after [`marked_section_start_and_keyword`].
 ///
 /// The content of `IGNORE` marked sections will match `<![` and `]]>` pairs,
 /// stopping on the first unmatched `]]>` found.
@@ -421,33 +418,36 @@ mod tests {
     #[test]
     fn test_marked_section_start() {
         assert_eq!(
-            marked_section_start::<E>("<![IGNORE [ lkjsdflkj sdflkj sdflkj  ]]>"),
+            marked_section_start_and_keyword::<E>("<![IGNORE [ lkjsdflkj sdflkj sdflkj  ]]>"),
             Ok((" lkjsdflkj sdflkj sdflkj  ]]>", "IGNORE"))
         );
         assert_eq!(
-            marked_section_start::<E>("<![ %Some.Condition[<x></x>]]>"),
+            marked_section_start_and_keyword::<E>("<![ %Some.Condition[<x></x>]]>"),
             Ok(("<x></x>]]>", "%Some.Condition"))
         );
         assert_eq!(
-            marked_section_start::<E>("<![CDATA[Hello]] world]]>"),
+            marked_section_start_and_keyword::<E>("<![CDATA[Hello]] world]]>"),
             Ok(("Hello]] world]]>", "CDATA"))
         );
         assert_eq!(
-            marked_section_start::<E>("<![ %cond;[ ]]>"),
+            marked_section_start_and_keyword::<E>("<![ %cond;[ ]]>"),
             Ok((" ]]>", "%cond;"))
         );
         assert_eq!(
-            marked_section_start::<E>("<![ RCDATA TEMP [ "),
+            marked_section_start_and_keyword::<E>("<![ RCDATA TEMP [ "),
             Ok((" ", "RCDATA TEMP"))
         );
         assert_eq!(
-            marked_section_start::<E>("<![[]>]]]]]>"),
+            marked_section_start_and_keyword::<E>("<![[]>]]]]]>"),
             Ok(("]>]]]]]>", ""))
         );
-        assert_eq!(marked_section_start::<E>("<![ [abc]]>"), Ok(("abc]]>", "")));
-        marked_section_start::<E>("<![ IGNORE <").unwrap_err();
-        marked_section_start::<E>("<![ IGNORE >").unwrap_err();
-        marked_section_start::<E>("<![ IGNORE ]]>").unwrap_err();
+        assert_eq!(
+            marked_section_start_and_keyword::<E>("<![ [abc]]>"),
+            Ok(("abc]]>", ""))
+        );
+        marked_section_start_and_keyword::<E>("<![ IGNORE <").unwrap_err();
+        marked_section_start_and_keyword::<E>("<![ IGNORE >").unwrap_err();
+        marked_section_start_and_keyword::<E>("<![ IGNORE ]]>").unwrap_err();
     }
 
     #[test]

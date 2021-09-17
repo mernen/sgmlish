@@ -152,17 +152,20 @@ impl MarkedSectionHandling {
     /// Parses the status keywords in the given string according to the chosen rules.
     ///
     /// Returns `None` if any of the keywords is rejected.
-    pub fn parse_keywords(&self, status_keywords: &str) -> Option<MarkedSectionStatus> {
+    pub fn parse_keywords<'a>(
+        &self,
+        status_keywords: &'a str,
+    ) -> Result<MarkedSectionStatus, &'a str> {
         match self {
             // In this mode, only one keyword is accepted; even combining
             // two otherwise acceptable keywords (e.g. `<![CDATA CDATA[`) is rejected
             MarkedSectionHandling::AcceptOnlyCharacterData => match status_keywords.parse() {
                 Ok(status @ (MarkedSectionStatus::CData | MarkedSectionStatus::RcData)) => {
-                    Some(status)
+                    Ok(status)
                 }
-                _ => None,
+                _ => Err(status_keywords),
             },
-            _ => MarkedSectionStatus::from_keywords(status_keywords).ok(),
+            _ => MarkedSectionStatus::from_keywords(status_keywords),
         }
     }
 }

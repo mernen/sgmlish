@@ -14,7 +14,7 @@ use super::raw::comment_declaration;
 pub fn take_until_terminated<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     ctx: &'static str,
     delimiter: &'static str,
-) -> impl Parser<&'a str, &'a str, E> {
+) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
     let fail = move |input: &'a str| {
         // Pointing at the very last character isn't very useful when there's a terminating newline.
         // So we try to skip any completely blank lines, and instead point at the last character in

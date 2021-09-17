@@ -24,7 +24,7 @@ pub enum Error {
     #[error(transparent)]
     EntityError(#[from] crate::entities::EntityError),
     /// An error ocurred when processing a marked section.
-    #[error("unrecognized marked section keyword: {0}")]
+    #[error("invalid marked section keyword: {0}")]
     InvalidMarkedSectionKeyword(String),
 }
 
