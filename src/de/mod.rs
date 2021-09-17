@@ -42,15 +42,16 @@ mod buffer;
 /// # fn main() -> sgmlish::Result<()> {
 /// let sgml = r##"
 ///     <SELECT NAME="color">
-///         <OPTION VALUE="">Choose one</OPTION>
-///         <OPTION SELECTED>Red</OPTION>
-///         <OPTION>Green</OPTION>
-///         <OPTION>Blue</OPTION>
+///         <OPTION VALUE="">Choose one
+///         <OPTION SELECTED>Red
+///         <OPTION>Green
+///         <OPTION>Blue
 ///     </SELECT>
 /// "##;
 /// let sgml = sgmlish::Parser::builder()
 ///     .lowercase_names()
 ///     .parse(sgml)?;
+/// let sgml = sgmlish::transforms::normalize_end_tags(sgml)?;
 /// let select = sgmlish::from_fragment::<Select>(sgml)?;
 ///
 /// println!("Deserialized:\n{:#?}", select);
