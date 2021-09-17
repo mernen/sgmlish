@@ -1,24 +1,20 @@
-`sgmlish`
-=========
+sgmlish
+=======
 
 [![Build status]](https://github.com/mernen/sgmlish/actions/workflows/ci.yml)
 [![Version badge]](https://crates.io/crates/sgmlish)
 [![Docs badge]](https://docs.rs/sgmlish)
 
-This is a library for handling SGML. It's not intended to be a full-featured
-implementation of the SGML spec; rather, it's meant to successfully parse
-common SGML uses, and then apply a number of normalization passes to make it
-suitable for deserialization, like inserting implied end tags.
+sgmlish is a library for parsing, manipulating and deserializing SGML.
 
-In particular, DTDs are not supported. That means any desired validation or
-normalization must be performed either manually or through the built-in
-transforms.
+It's not intended to be a full-featured implementation of the SGML spec;
+rather, it's meant to successfully parse SGML documents for most common
+applications, like [OFX] 1.x, and then delegate to [Serde].
 
-
-## Goals
-
-* Implementing just enough SGML to parse data you might find in the wild
-  for a specific, known use case, like [OFX] 1.x, then delegating to [Serde].
+In particular, DTDs are not supported. That means case normalization and entities
+must be configured before parsing, and any desired validation or normalization,
+like inserting omitted tags, must be either performed through a built-in transform
+or implemented manually.
 
 
 ## Non-goals
@@ -53,7 +49,7 @@ First, add `sgmlish` and `serde` to your dependencies:
 # Cargo.toml
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-sgmlish = "0.1"
+sgmlish = "0.2"
 ```
 
 Defining your data structures is similar to using any other Serde library:
@@ -74,7 +70,7 @@ Usage is typically performed in three steps:
 let input = r##"
     <CRATE>
         <NAME>sgmlish
-        <VERSION>0.1
+        <VERSION>0.2
     </CRATE>
 "##;
 // Step 1: configure parser, then parse string
@@ -155,6 +151,9 @@ let example = sgmlish::from_fragment::<Example>(sgml)?;
     content: String,
   }
   ```
+
+  When `$value` is used, all other fields must come from attributes in the
+  container element.
 
 * Sequences: sequences are read from a contiguous series of elements
   with the same name.
