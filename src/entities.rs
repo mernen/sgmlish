@@ -48,6 +48,9 @@ pub fn expand_character_references(text: &str) -> Result<Cow<str>> {
 /// Function names (`&#SPACE;`) as well as invalid character references
 /// (codes that go beyond Unicode, e.g. `&#1234567;`) are also passed to the closure.
 ///
+/// If the closure returns `None`, the entity is considered invalid,
+/// and the expansion fails.
+///
 /// # Example
 ///
 /// ```rust
@@ -64,12 +67,15 @@ where
     F: FnMut(&str) -> Option<T>,
     T: AsRef<str>,
 {
-    expand_entities_with(text, '&', entity_or_char_ref, f)
+    expand_entities_with(text, "&", entity_or_char_ref, f)
 }
 
 /// Expands parameter entities (`%foo;`) in the text using the given closure as lookup.
 /// Parameter referencies are only used in specific parts of DTDs;
-/// for SGML content, use [`expand_entities`] instead.
+/// for SGML document content, use [`expand_entities`] instead.
+///
+/// If the closure returns `None`, the parameter entity is considered invalid,
+/// and the expansion fails.
 ///
 /// # Example
 ///
@@ -87,26 +93,31 @@ where
     F: FnMut(&str) -> Option<T>,
     T: AsRef<str>,
 {
-    expand_entities_with(text, '%', entity, f)
+    expand_entities_with(text, "%", entity, f)
 }
 
-fn expand_entities_with<P, F, T>(text: &str, prefix: char, matcher: P, mut f: F) -> Result<Cow<str>>
+fn expand_entities_with<'a, M, F, T>(
+    text: &'a str,
+    prefix: &str,
+    matcher: M,
+    mut f: F,
+) -> Result<Cow<'a, str>>
 where
-    P: FnMut(&str) -> IResult<&str, EntityRef>,
-    F: FnMut(&str) -> Option<T>,
+    M: FnMut(&str) -> IResult<&str, EntityRef>,
+    F: FnMut(&'a str) -> Option<T>,
     T: AsRef<str>,
 {
-    let mut rest = text;
-    let mut out = String::new();
-
     // Suffix the matcher with optional `;`
     let mut matcher = terminated(matcher, opt(tag(";")));
 
-    while let Some(next_prefix) = rest.find(prefix) {
-        let (intermezzo, candidate) = rest.split_at(next_prefix);
-        out.push_str(intermezzo);
-        match matcher(&candidate[1..]) {
-            Ok((remainder, EntityRef::Entity(name))) => {
+    let mut remainder = text;
+    let mut out = String::new();
+
+    while let Some(position) = remainder.find(prefix) {
+        let (mid, candidate) = remainder.split_at(position);
+        out.push_str(mid);
+        match matcher(&candidate[prefix.len()..]) {
+            Ok((after, EntityRef::Entity(name))) => {
                 out.push_str(
                     f(name)
                         .ok_or_else(|| EntityError {
@@ -115,25 +126,24 @@ where
                         })?
                         .as_ref(),
                 );
-                rest = remainder;
+                remainder = after;
             }
-            Ok((remainder, EntityRef::Char(c))) => {
+            Ok((after, EntityRef::Char(c))) => {
                 out.push(c);
-                rest = remainder;
+                remainder = after;
             }
             Err(_) => {
-                let (c, remainder) = candidate.split_at(1);
-                out.push_str(c);
-                rest = remainder;
+                out.push_str(prefix);
+                remainder = &candidate[prefix.len()..];
             }
         }
     }
 
-    if rest.len() == text.len() {
+    if remainder.len() == text.len() {
         return Ok(text.into());
     }
 
-    out.push_str(rest);
+    out.push_str(remainder);
     Ok(out.into())
 }
 
