@@ -11,7 +11,7 @@ use nom::multi::many0_count;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
 
-use crate::is_sgml_whitespace;
+use crate::text::is_sgml_whitespace;
 
 use super::util::{spaces, strip_spaces_after, strip_spaces_around, take_until_terminated};
 

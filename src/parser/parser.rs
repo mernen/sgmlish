@@ -5,7 +5,8 @@ use nom::Finish;
 
 use crate::marked_sections::MarkedSectionStatus;
 use crate::parser::events;
-use crate::{entities, is_sgml_whitespace, SgmlFragment};
+use crate::text::is_sgml_whitespace;
+use crate::{entities, SgmlFragment};
 
 // Import used for documentation links
 #[allow(unused_imports)]

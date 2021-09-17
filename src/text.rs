@@ -1,11 +1,57 @@
+//! Functions for dealing with textual character data.
+
 use std::fmt::{self, Write};
 use std::iter::FusedIterator;
 
+/// Matches the most common definition of whitespace in SGML:
+/// ASCII space, tab, newline, and carriage return. (`" \t\r\n"`)
+///
+/// This definition does not include other Unicode whitespace characters, and
+/// it differs slightly from Rust's [`char::is_ascii_whitespace`] in that
+/// U+000C FORM FEED is not considered whitespace.
+///
+/// # Example
+///
+/// Trimming whitespace according to SGML rules:
+///
+/// ```rust
+/// # use sgmlish::text::is_sgml_whitespace;
+/// let trimmed = "\n    Some text\n  ".trim_matches(is_sgml_whitespace);
+/// assert_eq!(trimmed, "Some text");
+/// ```
+pub fn is_sgml_whitespace(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\r' | '\n')
+}
+
+pub(crate) fn is_blank(s: &str) -> bool {
+    s.chars().all(is_sgml_whitespace)
+}
+
+/// Returns an iterator that escapes characters that cannot be represented in
+/// SGML text (`<`, `>`, `&`) using character references (`&#60;`).
+///
+/// This is not safe for attribute values!
+///
+/// # Examples
+///
+/// The returned value can be used with `println!` or other formatting macros:
+///
+/// ```rust
+/// # use sgmlish::text::escape;
+/// println!("Escaped: {}", escape("Sonic & Knuckles"));
+/// ```
+///
+/// To convert to a string:
+///
+/// ```rust
+/// # use sgmlish::text::escape;
+/// assert_eq!(escape("Sonic & Knuckles").to_string(), "Sonic &#38; Knuckles");
+/// ```
 pub fn escape(text: &str) -> Escape {
     Escape::new(text)
 }
 
-/// The return type of [`Data::escape`].
+/// The return type of [`escape`].
 #[derive(Clone, Debug)]
 pub struct Escape<'a> {
     escape_ampersand: bool,
@@ -22,12 +68,13 @@ impl<'a> Escape<'a> {
         }
     }
 
+    /// Changes whether ampersands (`&`) should be escaped.
     pub fn set_escape_ampersand(&mut self, escape_ampersand: bool) {
         self.escape_ampersand = escape_ampersand;
     }
 }
 
-impl<'a> Iterator for Escape<'a> {
+impl Iterator for Escape<'_> {
     type Item = char;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -74,7 +121,7 @@ impl<'a> Iterator for Escape<'a> {
 
 impl FusedIterator for Escape<'_> {}
 
-impl<'a> fmt::Display for Escape<'a> {
+impl fmt::Display for Escape<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.clone().try_for_each(|c| f.write_char(c))
     }
@@ -83,6 +130,17 @@ impl<'a> fmt::Display for Escape<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_sgml_whitespace() {
+        assert!(is_sgml_whitespace(' '));
+        assert!(is_sgml_whitespace('\t'));
+        assert!(is_sgml_whitespace('\r'));
+        assert!(is_sgml_whitespace('\n'));
+        assert!(!is_sgml_whitespace('a'));
+        assert!(!is_sgml_whitespace('\u{0c}'));
+        assert!(!is_sgml_whitespace('\u{a0}'));
+    }
 
     #[test]
     fn test_escape_noop() {
@@ -102,6 +160,14 @@ mod tests {
         let mut esc = escape("hello && <world>");
         esc.set_escape_ampersand(false);
         assert_eq!(esc.to_string(), "hello && &#60;world&#62;");
+    }
+
+    #[test]
+    fn test_escape_size_hint_bounds() {
+        let min = "\u{1f970}\u{1f918}";
+        assert_eq!(escape(min).size_hint().0, escape(min).count());
+        let max = "<&>";
+        assert_eq!(escape(max).size_hint().1, Some(escape(max).count()));
     }
 
     #[test]

@@ -2,19 +2,18 @@
 //!
 //! For a quick example of deserialization, see [`from_fragment`].
 
-mod data;
 pub mod entities;
 pub mod error;
 mod fragment;
 pub mod marked_sections;
 pub mod parser;
+pub mod text;
 pub mod transforms;
 mod util;
 
 use std::borrow::Cow;
 use std::fmt::{self, Write};
 
-pub use data::*;
 pub use error::{Error, Result};
 pub use fragment::*;
 pub use parser::{parse, Parser, ParserConfig};
@@ -127,49 +126,14 @@ impl fmt::Display for SgmlEvent<'_> {
             SgmlEvent::CloseStartTag => f.write_str(">"),
             SgmlEvent::XmlCloseEmptyElement => f.write_str("/>"),
             SgmlEvent::EndTag(name) => write!(f, "</{}>", name),
-            SgmlEvent::Character(value) => fmt::Display::fmt(&data::escape(value), f),
+            SgmlEvent::Character(value) => fmt::Display::fmt(&text::escape(value), f),
         }
     }
-}
-
-/// Matches the most common definition of whitespace in SGML:
-/// ASCII space, tab, newline, and carriage return. (`" \t\r\n"`)
-///
-/// This definition does not include other Unicode whitespace characters, and
-/// it differs slightly from Rust's [`char::is_ascii_whitespace`] in that
-/// U+000C FORM FEED is not considered whitespace.
-///
-/// # Example
-///
-/// Trimming whitespace according to SGML rules:
-///
-/// ```rust
-/// # use sgmlish::is_sgml_whitespace;
-/// let trimmed = "\n    Some text\n  ".trim_matches(is_sgml_whitespace);
-/// assert_eq!(trimmed, "Some text");
-/// ```
-pub fn is_sgml_whitespace(c: char) -> bool {
-    matches!(c, ' ' | '\t' | '\r' | '\n')
-}
-
-pub(crate) fn is_blank(s: &str) -> bool {
-    s.trim_start_matches(is_sgml_whitespace).is_empty()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_is_sgml_whitespace() {
-        assert!(is_sgml_whitespace(' '));
-        assert!(is_sgml_whitespace('\t'));
-        assert!(is_sgml_whitespace('\r'));
-        assert!(is_sgml_whitespace('\n'));
-        assert!(!is_sgml_whitespace('a'));
-        assert!(!is_sgml_whitespace('\u{0c}'));
-        assert!(!is_sgml_whitespace('\u{a0}'));
-    }
 
     #[test]
     fn test_event_display() {

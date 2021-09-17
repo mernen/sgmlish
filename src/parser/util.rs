@@ -9,7 +9,7 @@ use nom::multi::many0_count;
 use nom::sequence::{delimited, terminated};
 use nom::{IResult, Parser};
 
-use crate::is_sgml_whitespace;
+use crate::text::is_sgml_whitespace;
 
 use super::raw;
 
