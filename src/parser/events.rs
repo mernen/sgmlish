@@ -14,10 +14,9 @@ use nom::IResult;
 use crate::marked_sections::MarkedSectionStatus;
 use crate::{Error, SgmlEvent};
 
-use super::parser::ParserConfig;
 use super::raw::{self, comment_declaration, MarkedSectionEndHandling};
 use super::util::{comments_and_spaces, strip_comments_and_spaces_after, strip_spaces_after};
-use super::MarkedSectionHandling;
+use super::{MarkedSectionHandling, ParserConfig};
 
 pub fn document_entity<'a, E>(
     input: &'a str,
