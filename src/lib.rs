@@ -55,7 +55,7 @@ pub enum SgmlEvent<'a> {
     /// with an empty slice.
     OpenStartTag(Cow<'a, str>),
     /// An attribute inside a start-element tag, e.g. `FOO="bar"`.
-    Attribute(Cow<'a, str>, Option<Data<'a>>),
+    Attribute(Cow<'a, str>, Option<Cow<'a, str>>),
     /// Closing of a start-element tag, e.g. `>`.
     CloseStartTag,
     /// XML-specific closing of empty elements, e.g. `/>`
@@ -66,7 +66,7 @@ pub enum SgmlEvent<'a> {
     /// with an empty slice.
     EndTag(Cow<'a, str>),
     /// Any string of characters that is not part of a tag.
-    Character(Data<'a>),
+    Character(Cow<'a, str>),
 }
 
 impl<'a> SgmlEvent<'a> {
@@ -83,12 +83,12 @@ impl<'a> SgmlEvent<'a> {
             },
             SgmlEvent::OpenStartTag(name) => SgmlEvent::OpenStartTag(make_owned(name)),
             SgmlEvent::Attribute(key, value) => {
-                SgmlEvent::Attribute(make_owned(key), value.map(Data::into_owned))
+                SgmlEvent::Attribute(make_owned(key), value.map(make_owned))
             }
             SgmlEvent::CloseStartTag => SgmlEvent::CloseStartTag,
             SgmlEvent::XmlCloseEmptyElement => SgmlEvent::XmlCloseEmptyElement,
             SgmlEvent::EndTag(name) => SgmlEvent::EndTag(make_owned(name)),
-            SgmlEvent::Character(data) => SgmlEvent::Character(data.into_owned()),
+            SgmlEvent::Character(text) => SgmlEvent::Character(make_owned(text)),
         }
     }
 }
@@ -106,13 +106,10 @@ impl fmt::Display for SgmlEvent<'_> {
                 write!(f, "<![{}[{}]]>", status_keywords, section)
             }
             SgmlEvent::OpenStartTag(name) => write!(f, "<{}", name),
-            SgmlEvent::Attribute(name, value) => {
+            SgmlEvent::Attribute(name, None) => f.write_str(name),
+            SgmlEvent::Attribute(name, Some(value)) => {
                 f.write_str(name)?;
-                let (value, verbatim) = match value {
-                    Some(data) => (data.as_str(), data.verbatim()),
-                    None => return Ok(()),
-                };
-                let escape_ampersand = verbatim && value.contains('&');
+                let escape_ampersand = value.contains('&');
                 if !escape_ampersand && !value.contains('"') {
                     write!(f, "=\"{}\"", value)
                 } else if !escape_ampersand && !value.contains('\'') {
@@ -121,7 +118,7 @@ impl fmt::Display for SgmlEvent<'_> {
                     f.write_str("=\"")?;
                     value.chars().try_for_each(|c| match c {
                         '"' => f.write_str("&#34;"),
-                        '&' if escape_ampersand => f.write_str("&#38;"),
+                        '&' => f.write_str("&#38;"),
                         c => f.write_char(c),
                     })?;
                     f.write_str("\"")
@@ -130,7 +127,7 @@ impl fmt::Display for SgmlEvent<'_> {
             SgmlEvent::CloseStartTag => f.write_str(">"),
             SgmlEvent::XmlCloseEmptyElement => f.write_str("/>"),
             SgmlEvent::EndTag(name) => write!(f, "</{}>", name),
-            SgmlEvent::Character(value) => fmt::Display::fmt(&value.escape(), f),
+            SgmlEvent::Character(value) => fmt::Display::fmt(&data::escape(value), f),
         }
     }
 }
@@ -188,7 +185,7 @@ mod tests {
 
         assert_eq!(format!("{}", OpenStartTag("foo".into())), "<foo");
         assert_eq!(
-            format!("{}", Attribute("foo".into(), Some(RcData("bar".into())))),
+            format!("{}", Attribute("foo".into(), Some("bar".into()))),
             "foo=\"bar\""
         );
         assert_eq!(format!("{}", Attribute("foo".into(), None)), "foo");
@@ -197,56 +194,38 @@ mod tests {
         assert_eq!(format!("{}", EndTag("foo".into())), "</foo>");
         assert_eq!(format!("{}", EndTag("".into())), "</>");
 
-        assert_eq!(format!("{}", Character(RcData("hello".into()))), "hello");
+        assert_eq!(format!("{}", Character("hello".into())), "hello");
     }
 
     #[test]
     fn test_display_attribute() {
         assert_eq!(SgmlEvent::Attribute("key".into(), None).to_string(), "key");
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::CData("value".into()))).to_string(),
+            SgmlEvent::Attribute("key".into(), Some("value".into())).to_string(),
             "key=\"value\""
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::CData("va'lue".into()))).to_string(),
+            SgmlEvent::Attribute("key".into(), Some("va'lue".into())).to_string(),
             "key=\"va'lue\""
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::CData("va\"lue".into()))).to_string(),
+            SgmlEvent::Attribute("key".into(), Some("va\"lue".into())).to_string(),
             "key='va\"lue'"
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::CData("va\"lu'e".into()))).to_string(),
+            SgmlEvent::Attribute("key".into(), Some("va\"lu'e".into())).to_string(),
             "key=\"va&#34;lu'e\""
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::RcData("va\"lu'e".into()))).to_string(),
-            "key=\"va&#34;lu'e\""
-        );
-
-        assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::RcData("a&o".into()))).to_string(),
-            "key=\"a&o\""
-        );
-        assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::CData("a&o".into()))).to_string(),
+            SgmlEvent::Attribute("key".into(), Some("a&o".into())).to_string(),
             "key=\"a&#38;o\""
         );
-
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::RcData("a&o\"".into()))).to_string(),
-            "key='a&o\"'"
-        );
-        assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::CData("a&o\"".into()))).to_string(),
+            SgmlEvent::Attribute("key".into(), Some("a&o\"".into())).to_string(),
             "key=\"a&#38;o&#34;\""
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::RcData("a&o'".into()))).to_string(),
-            "key=\"a&o'\""
-        );
-        assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some(Data::CData("a&o'".into()))).to_string(),
+            SgmlEvent::Attribute("key".into(), Some("a&o'".into())).to_string(),
             "key=\"a&#38;o'\""
         );
     }

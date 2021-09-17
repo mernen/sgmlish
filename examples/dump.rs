@@ -4,7 +4,6 @@ use std::io::Read;
 use std::process;
 
 use sgmlish::transforms::Transform;
-use sgmlish::Data::CData;
 use sgmlish::{SgmlEvent, SgmlFragment};
 
 fn main() {
@@ -64,7 +63,7 @@ fn reindent(fragment: SgmlFragment) -> SgmlFragment {
         for _ in 0..level {
             s.push_str("  ");
         }
-        SgmlEvent::Character(CData(s.into()))
+        SgmlEvent::Character(s.into())
     }
 
     for (i, event) in fragment.iter().enumerate() {

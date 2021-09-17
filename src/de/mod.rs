@@ -161,7 +161,7 @@ impl<'de> SgmlDeserializer<'de> {
             .find_map(|event| match event {
                 SgmlEvent::OpenStartTag(_) => Some(true),
                 SgmlEvent::EndTag(_) => Some(false),
-                SgmlEvent::Character(data) if !data.is_blank() => {
+                SgmlEvent::Character(text) if !text.is_empty() => {
                     contains_text = true;
                     None
                 }
@@ -297,7 +297,7 @@ impl<'de> SgmlDeserializer<'de> {
             let value = mem::take(value);
             debug!("consumed text from attribute({}): {:?}", key, value);
             self.advance()?;
-            return Ok(value.unwrap_or_default().into_cow());
+            return Ok(value.unwrap_or_default());
         }
 
         let starting_stack_size = self.stack.len();
@@ -316,8 +316,8 @@ impl<'de> SgmlDeserializer<'de> {
                         break;
                     }
                 }
-                SgmlEvent::Character(data) => {
-                    text.push_data(data);
+                SgmlEvent::Character(t) => {
+                    text.push_cow(t);
                     self.advance()?;
                 }
                 _ => self.advance()?,
@@ -402,7 +402,7 @@ impl<'de, 'r> Deserializer<'de> for &'r mut SgmlDeserializer<'de> {
 
         if let SgmlEvent::Attribute(key, value) = self.peek()? {
             // Treat empty values and repetitions of the key as true values
-            let value = value.as_ref().map(|v| v.as_str()).unwrap_or_default();
+            let value = value.as_deref().unwrap_or_default();
             if value.is_empty() || value.eq_ignore_ascii_case(key) {
                 self.advance()?;
                 return visitor.visit_bool(true);
@@ -770,9 +770,9 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
                     }
                     ContentStrategy::TextOnly => unreachable!(),
                 },
-                SgmlEvent::Character(data) => {
+                SgmlEvent::Character(text) => {
                     if let Some(value_acc) = &mut self.text_content {
-                        value_acc.push_data(data);
+                        value_acc.push_cow(text);
                     }
                     self.de.advance()?;
                     continue;
@@ -844,9 +844,7 @@ impl<'de, 'r> de::SeqAccess<'de> for SeqAccess<'de, 'r> {
                         return Ok(Some(seed.deserialize(&mut *self.de)?));
                     }
                 },
-                SgmlEvent::Character(data) if data.is_blank() => {
-                    self.de.advance()?;
-                }
+                SgmlEvent::Character(text) if text.is_empty() => self.de.advance()?,
                 _ => return Ok(None),
             };
         }

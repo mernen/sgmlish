@@ -12,7 +12,7 @@ use nom::sequence::{terminated, tuple};
 use nom::IResult;
 
 use crate::marked_sections::MarkedSectionStatus;
-use crate::{Data, Error, SgmlEvent};
+use crate::{Error, SgmlEvent};
 
 use super::parser::ParserConfig;
 use super::raw::{self, comment_declaration, MarkedSectionEndHandling};
@@ -157,9 +157,7 @@ where
                 map(raw::marked_section_body_ignore, |_| EventIter::empty())(input)
             }
             MarkedSectionStatus::CData => map(raw::marked_section_body_character, |content| {
-                EventIter::once(SgmlEvent::Character(Data::CData(
-                    config.trim(content).into(),
-                )))
+                EventIter::once(SgmlEvent::Character(config.trim(content).into()))
             })(input),
             MarkedSectionStatus::RcData => {
                 let (rest, content) = raw::marked_section_body_character(input)?;
@@ -459,7 +457,6 @@ impl FusedIterator for EventIter<'_> {}
 mod tests {
     use crate::parser::Parser;
 
-    use super::Data::*;
     use super::SgmlEvent::*;
     use super::*;
 
@@ -498,7 +495,7 @@ mod tests {
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Character(CData("My first HTML document".into())))
+            Some(Character("My first HTML document".into()))
         );
         assert_eq!(events.next(), Some(EndTag("TITLE".into())));
         assert_eq!(events.next(), Some(EndTag("HEAD".into())));
@@ -508,7 +505,7 @@ mod tests {
 
         assert_eq!(events.next(), Some(OpenStartTag("P".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
-        assert_eq!(events.next(), Some(Character(CData("Hello world!".into()))));
+        assert_eq!(events.next(), Some(Character("Hello world!".into())));
 
         assert_eq!(events.next(), Some(EndTag("BODY".into())));
         assert_eq!(events.next(), Some(EndTag("HTML".into())));
@@ -538,54 +535,42 @@ mod tests {
 
         assert_eq!(events.next(), Some(OpenStartTag("HTML".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
-        assert_eq!(
-            events.next(),
-            Some(Character(CData("\n                ".into())))
-        );
+        assert_eq!(events.next(), Some(Character("\n                ".into())));
         assert_eq!(events.next(), Some(OpenStartTag("HEAD".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Character(CData("\n                    ".into())))
+            Some(Character("\n                    ".into()))
         );
         assert_eq!(events.next(), Some(OpenStartTag("TITLE".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Character(CData("My first HTML document".into())))
+            Some(Character("My first HTML document".into()))
         );
         assert_eq!(events.next(), Some(EndTag("TITLE".into())));
-        assert_eq!(
-            events.next(),
-            Some(Character(CData("\n                ".into())))
-        );
+        assert_eq!(events.next(), Some(Character("\n                ".into())));
         assert_eq!(events.next(), Some(EndTag("HEAD".into())));
-        assert_eq!(
-            events.next(),
-            Some(Character(CData("\n                ".into())))
-        );
+        assert_eq!(events.next(), Some(Character("\n                ".into())));
 
         assert_eq!(events.next(), Some(OpenStartTag("BODY".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Character(CData("\n                    ".into())))
+            Some(Character("\n                    ".into()))
         );
 
         assert_eq!(events.next(), Some(OpenStartTag("P".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(
             events.next(),
-            Some(Character(CData("Hello world!\n                ".into())))
+            Some(Character("Hello world!\n                ".into()))
         );
 
         assert_eq!(events.next(), Some(EndTag("BODY".into())));
-        assert_eq!(
-            events.next(),
-            Some(Character(CData("\n            ".into())))
-        );
+        assert_eq!(events.next(), Some(Character("\n            ".into())));
         assert_eq!(events.next(), Some(EndTag("HTML".into())));
-        assert_eq!(events.next(), Some(Character(CData("\n        ".into()))));
+        assert_eq!(events.next(), Some(Character("\n        ".into())));
     }
 
     #[test]
@@ -640,11 +625,11 @@ mod tests {
         assert_eq!(events.next(), Some(OpenStartTag("a".into())));
         assert_eq!(
             events.next(),
-            Some(Attribute("href".into(), Some(CData("test.htm".into()))))
+            Some(Attribute("href".into(), Some("test.htm".into())))
         );
         assert_eq!(
             events.next(),
-            Some(Attribute("target".into(), Some(CData("_blank".into()))))
+            Some(Attribute("target".into(), Some("_blank".into())))
         );
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
@@ -660,11 +645,11 @@ mod tests {
         assert_eq!(events.next(), Some(OpenStartTag("a".into())));
         assert_eq!(
             events.next(),
-            Some(Attribute("href".into(), Some(CData("test.htm".into()))))
+            Some(Attribute("href".into(), Some("test.htm".into())))
         );
         assert_eq!(
             events.next(),
-            Some(Attribute("target".into(), Some(CData("_blank".into()))))
+            Some(Attribute("target".into(), Some("_blank".into())))
         );
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
@@ -680,11 +665,11 @@ mod tests {
         assert_eq!(events.next(), Some(OpenStartTag("A".into())));
         assert_eq!(
             events.next(),
-            Some(Attribute("HREF".into(), Some(CData("test.htm".into()))))
+            Some(Attribute("HREF".into(), Some("test.htm".into())))
         );
         assert_eq!(
             events.next(),
-            Some(Attribute("TARGET".into(), Some(CData("_blank".into()))))
+            Some(Attribute("TARGET".into(), Some("_blank".into())))
         );
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
@@ -700,11 +685,11 @@ mod tests {
         assert_eq!(events.next(), Some(OpenStartTag("img".into())));
         assert_eq!(
             events.next(),
-            Some(Attribute("alt".into(), Some(CData(" test ".into()))))
+            Some(Attribute("alt".into(), Some(" test ".into())))
         );
         assert_eq!(
             events.next(),
-            Some(Attribute("longdesc".into(), Some(CData(" desc".into()))))
+            Some(Attribute("longdesc".into(), Some(" desc".into())))
         );
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
@@ -780,7 +765,7 @@ mod tests {
         let mut iter = EventIter::start_tag((
             OpenStartTag("foo".into()),
             vec![
-                Attribute("x".into(), Some(CData("y".into()))),
+                Attribute("x".into(), Some("y".into())),
                 Attribute("z".into(), None),
             ],
             CloseStartTag,
@@ -788,21 +773,18 @@ mod tests {
 
         assert_eq!(
             format!("{:?}", iter),
-            r#"EventIter([OpenStartTag("foo"), Attribute("x", Some(CData("y"))), Attribute("z", None), CloseStartTag])"#
+            r#"EventIter([OpenStartTag("foo"), Attribute("x", Some("y")), Attribute("z", None), CloseStartTag])"#
         );
         assert_eq!(iter.len(), 4);
 
         assert_eq!(iter.next(), Some(OpenStartTag("foo".into())));
         assert_eq!(
             format!("{:?}", iter),
-            r#"EventIter([Attribute("x", Some(CData("y"))), Attribute("z", None), CloseStartTag])"#
+            r#"EventIter([Attribute("x", Some("y")), Attribute("z", None), CloseStartTag])"#
         );
         assert_eq!(iter.len(), 3);
 
-        assert_eq!(
-            iter.next(),
-            Some(Attribute("x".into(), Some(CData("y".into()))))
-        );
+        assert_eq!(iter.next(), Some(Attribute("x".into(), Some("y".into()))));
         assert_eq!(
             format!("{:?}", iter),
             r#"EventIter([Attribute("z", None), CloseStartTag])"#

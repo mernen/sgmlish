@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use std::mem;
 
-use crate::Data;
-
 /// A `Cow` string builder that consumes its inputs, avoiding cloning or
 /// reallocating when there's just one source.
 #[derive(Debug)]
@@ -13,11 +11,8 @@ impl<'a> CowBuffer<'a> {
         CowBuffer(Cow::from(""))
     }
 
-    pub(crate) fn push_data(&mut self, data: &mut Data<'a>) {
-        let cow = match mem::replace(data, Data::RcData("*CONSUMED*".into())) {
-            Data::CData(cow) => cow,
-            Data::RcData(_) => unreachable!("unexpanded RcData found"),
-        };
+    pub(crate) fn push_cow(&mut self, data: &mut Cow<'a, str>) {
+        let cow = mem::replace(data, "*CONSUMED*".into());
         if cow.is_empty() {
             return;
         }
@@ -46,10 +41,10 @@ mod tests {
         let mut buf = CowBuffer::new();
         assert!(buf.0.is_empty());
 
-        buf.push_data(&mut Data::CData("Hello".into()));
+        buf.push_cow(&mut "Hello".into());
         assert!(matches!(buf, CowBuffer(Cow::Borrowed("Hello"))));
 
-        buf.push_data(&mut Data::CData(" World".into()));
+        buf.push_cow(&mut " World".into());
         assert_eq!(buf.0, "Hello World");
     }
 }

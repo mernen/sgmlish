@@ -103,10 +103,10 @@ pub fn normalize_end_tags(mut fragment: SgmlFragment) -> Result<SgmlFragment, No
                 stack.push(name);
                 next_insertion_point = i;
             }
-            SgmlEvent::Character(data) => {
-                if next_insertion_point == i + 1 && data.is_blank() {
-                    next_insertion_point -= 1;
-                }
+            SgmlEvent::Character(text)
+                if next_insertion_point == i + 1 && crate::is_blank(text) =>
+            {
+                next_insertion_point = i;
             }
             _ => {}
         }

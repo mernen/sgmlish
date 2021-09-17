@@ -28,15 +28,15 @@ impl<'a> Transform<'a> {
     /// # Example
     ///
     /// ```rust
-    /// # use sgmlish::{RcData, SgmlEvent, SgmlFragment};
+    /// # use sgmlish::{SgmlEvent, SgmlFragment};
     /// # use sgmlish::transforms::Transform;
     /// let fragment = SgmlFragment::from(vec![
     ///     /* 0 */ SgmlEvent::OpenStartTag("A".into()),
-    ///     /* 1 */ SgmlEvent::Attribute("HREF".into(), Some(RcData("/".into()))),
+    ///     /* 1 */ SgmlEvent::Attribute("HREF".into(), Some("/".into())),
     ///     /* 2 */ SgmlEvent::CloseStartTag,
-    ///     /* 3 */ SgmlEvent::Character(RcData("hello".into())),
+    ///     /* 3 */ SgmlEvent::Character("hello".into()),
     ///     /* 4 */ SgmlEvent::EndTag("A".into()),
-    ///     /* 5 */ SgmlEvent::Character(RcData("!".into())),
+    ///     /* 5 */ SgmlEvent::Character("!".into()),
     ///     /* 6 */
     /// ]);
     ///
@@ -52,7 +52,7 @@ impl<'a> Transform<'a> {
     ///     vec![
     ///         SgmlEvent::OpenStartTag("A".into()),
     ///         SgmlEvent::CloseStartTag,
-    ///         SgmlEvent::Character(RcData("hello".into())),
+    ///         SgmlEvent::Character("hello".into()),
     ///         SgmlEvent::EndTag("A".into()),
     ///     ]
     /// );
@@ -71,19 +71,19 @@ impl<'a> Transform<'a> {
     /// # Example
     ///
     /// ```rust
-    /// # use sgmlish::{RcData, SgmlEvent, SgmlFragment};
+    /// # use sgmlish::{SgmlEvent, SgmlFragment};
     /// # use sgmlish::transforms::Transform;
     /// let fragment = SgmlFragment::from(vec![
     ///     /* 0 */ SgmlEvent::OpenStartTag("A".into()),
-    ///     /* 1 */ SgmlEvent::Attribute("HREF".into(), Some(RcData("/".into()))),
+    ///     /* 1 */ SgmlEvent::Attribute("HREF".into(), Some("/".into())),
     ///     /* 2 */ SgmlEvent::CloseStartTag,
-    ///     /* 3 */ SgmlEvent::Character(RcData("hello".into())),
+    ///     /* 3 */ SgmlEvent::Character("hello".into()),
     ///     /* 4 */
     /// ]);
     ///
     /// let mut transform = Transform::new();
     /// // Insert another attribute
-    /// transform.insert_at(2, SgmlEvent::Attribute("TARGET".into(), Some(RcData("_blank".into()))));
+    /// transform.insert_at(2, SgmlEvent::Attribute("TARGET".into(), Some("_blank".into())));
     /// // Close the tag
     /// transform.insert_at(4, SgmlEvent::EndTag("A".into()));
     /// let result = transform.apply(fragment);
@@ -92,10 +92,10 @@ impl<'a> Transform<'a> {
     ///     result.into_vec(),
     ///     vec![
     ///         SgmlEvent::OpenStartTag("A".into()),
-    ///         SgmlEvent::Attribute("HREF".into(), Some(RcData("/".into()))),
-    ///         SgmlEvent::Attribute("TARGET".into(), Some(RcData("_blank".into()))),
+    ///         SgmlEvent::Attribute("HREF".into(), Some("/".into())),
+    ///         SgmlEvent::Attribute("TARGET".into(), Some("_blank".into())),
     ///         SgmlEvent::CloseStartTag,
-    ///         SgmlEvent::Character(RcData("hello".into())),
+    ///         SgmlEvent::Character("hello".into()),
     ///         SgmlEvent::EndTag("A".into()),
     ///     ]
     /// );
@@ -145,21 +145,16 @@ impl<'a> Transform<'a> {
 mod tests {
     use super::*;
 
-    use crate::RcData;
-
     #[test]
     fn test_insert_multiple_times_same_index() {
         let fragment = SgmlFragment::from(vec![
             SgmlEvent::OpenStartTag("IMG".into()),
-            SgmlEvent::Attribute("SRC".into(), Some(RcData("example.gif".into()))),
+            SgmlEvent::Attribute("SRC".into(), Some("example.gif".into())),
             SgmlEvent::CloseStartTag,
         ]);
 
         let mut transform = Transform::new();
-        transform.insert_at(
-            2,
-            SgmlEvent::Attribute("BORDER".into(), Some(RcData("0".into()))),
-        );
+        transform.insert_at(2, SgmlEvent::Attribute("BORDER".into(), Some("0".into())));
         transform.insert_at(2, SgmlEvent::Attribute("ISMAP".into(), None));
 
         let result = transform.apply(fragment);
@@ -168,8 +163,8 @@ mod tests {
             result,
             SgmlFragment::from(vec![
                 SgmlEvent::OpenStartTag("IMG".into()),
-                SgmlEvent::Attribute("SRC".into(), Some(RcData("example.gif".into()))),
-                SgmlEvent::Attribute("BORDER".into(), Some(RcData("0".into()))),
+                SgmlEvent::Attribute("SRC".into(), Some("example.gif".into())),
+                SgmlEvent::Attribute("BORDER".into(), Some("0".into())),
                 SgmlEvent::Attribute("ISMAP".into(), None),
                 SgmlEvent::CloseStartTag,
             ])
@@ -180,8 +175,8 @@ mod tests {
     fn test_remove_multiple_times_same_index() {
         let fragment = SgmlFragment::from(vec![
             SgmlEvent::OpenStartTag("IMG".into()),
-            SgmlEvent::Attribute("SRC".into(), Some(RcData("example.gif".into()))),
-            SgmlEvent::Attribute("BORDER".into(), Some(RcData("0".into()))),
+            SgmlEvent::Attribute("SRC".into(), Some("example.gif".into())),
+            SgmlEvent::Attribute("BORDER".into(), Some("0".into())),
             SgmlEvent::Attribute("ISMAP".into(), None),
             SgmlEvent::CloseStartTag,
         ]);
@@ -197,7 +192,7 @@ mod tests {
             result,
             SgmlFragment::from(vec![
                 SgmlEvent::OpenStartTag("IMG".into()),
-                SgmlEvent::Attribute("SRC".into(), Some(RcData("example.gif".into()))),
+                SgmlEvent::Attribute("SRC".into(), Some("example.gif".into())),
                 SgmlEvent::CloseStartTag,
             ])
         );
@@ -207,16 +202,16 @@ mod tests {
     fn test_insert_remove_at_same_index() {
         let fragment = SgmlFragment::from(vec![
             SgmlEvent::OpenStartTag("A".into()),
-            SgmlEvent::Attribute("HREF".into(), Some(RcData("/".into()))),
+            SgmlEvent::Attribute("HREF".into(), Some("/".into())),
             SgmlEvent::CloseStartTag,
-            SgmlEvent::Character(RcData("hello".into())),
+            SgmlEvent::Character("hello".into()),
             SgmlEvent::EndTag("A".into()),
         ]);
 
         let mut transform = Transform::new();
         transform.insert_at(
             1,
-            SgmlEvent::Attribute("NAME".into(), Some(RcData("greeting".into()))),
+            SgmlEvent::Attribute("NAME".into(), Some("greeting".into())),
         );
         transform.remove_at(1);
         let result = transform.apply(fragment);
@@ -225,9 +220,9 @@ mod tests {
             result,
             SgmlFragment::from(vec![
                 SgmlEvent::OpenStartTag("A".into()),
-                SgmlEvent::Attribute("NAME".into(), Some(RcData("greeting".into()))),
+                SgmlEvent::Attribute("NAME".into(), Some("greeting".into())),
                 SgmlEvent::CloseStartTag,
-                SgmlEvent::Character(RcData("hello".into())),
+                SgmlEvent::Character("hello".into()),
                 SgmlEvent::EndTag("A".into()),
             ])
         );

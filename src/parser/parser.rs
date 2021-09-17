@@ -5,7 +5,7 @@ use nom::Finish;
 
 use crate::marked_sections::MarkedSectionStatus;
 use crate::parser::events;
-use crate::{entities, is_sgml_whitespace, Data, SgmlFragment};
+use crate::{entities, is_sgml_whitespace, SgmlFragment};
 
 // Import used for documentation links
 #[allow(unused_imports)]
@@ -181,14 +181,12 @@ impl ParserConfig {
     }
 
     /// Parses the given replaceable character data, returning its final form.
-    pub fn parse_rcdata<'a, E>(&self, rcdata: &'a str) -> Result<Data<'a>, nom::Err<E>>
+    pub fn parse_rcdata<'a, E>(&self, rcdata: &'a str) -> Result<Cow<'a, str>, nom::Err<E>>
     where
         E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
     {
         let f = self.entity_fn.as_deref().unwrap_or(&|_| None);
-        entities::expand_entities(rcdata, f)
-            .map(Data::CData)
-            .map_err(|err| into_nom_failure(rcdata, err))
+        entities::expand_entities(rcdata, f).map_err(|err| into_nom_failure(rcdata, err))
     }
 
     /// Parses parameter entities in the given markup declaration text, returning its final form.
