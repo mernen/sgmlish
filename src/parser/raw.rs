@@ -85,13 +85,16 @@ where
     )(input)
 }
 
+const MARKED_SECTION_START: &str = "<![";
+const MARKED_SECTION_END: &str = "]]>";
+
 /// Matches `<![foo[` and outputs `foo`.
-pub fn marked_section_start_and_keyword<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn marked_section_start_and_keywords<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     preceded(
-        tag("<!["),
+        tag(MARKED_SECTION_START),
         cut(terminated(
             map(
                 take_till(|c| matches!(c, '[' | ']' | '<' | '>' | '!')),
@@ -102,17 +105,19 @@ where
     )(input)
 }
 
-/// Matches the content for `CDATA` and `RCDATA` marked sections, immediately after [`marked_section_start_and_keyword`].
+/// Matches the content for `CDATA` and `RCDATA` marked sections,
+/// immediately after [`marked_section_start_and_keywords`].
 ///
 /// These sections do nest, meaning they end on the first `]]>` found.
 pub fn marked_section_body_character<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    take_until_terminated(r##"marked section end ("]]>")"##, "]]>")(input)
+    take_until_terminated(r##"marked section end ("]]>")"##, MARKED_SECTION_END)(input)
 }
 
-/// Matches the content for `IGNORE` marked sections, immediately after [`marked_section_start_and_keyword`].
+/// Matches the content for `IGNORE` marked sections,
+/// immediately after [`marked_section_start_and_keywords`].
 ///
 /// The content of `IGNORE` marked sections will match `<![` and `]]>` pairs,
 /// stopping on the first unmatched `]]>` found.
@@ -120,21 +125,18 @@ pub fn marked_section_body_ignore<'a, E>(input: &'a str) -> IResult<&str, &str, 
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    use nom::{FindSubstring, Parser, Slice};
-    const START: &str = "<![";
-    const END: &str = "]]>";
-    let (close_suffix, close_match) =
-        take_until_terminated(r##"end of marked section ("]]>")"##, END).parse(input)?;
-    match input.find_substring(START) {
-        Some(n) if n < close_match.len() => {
-            let (suffix_after_matched_pair, _) = context(
-                "nested marked section",
-                marked_section_body_ignore,
-            )(input.slice(n + START.len()..))?;
+    use nom::{FindSubstring, Slice};
+    let (close_suffix, close_match) = marked_section_body_character(input)?;
+    match close_match.find_substring(MARKED_SECTION_START) {
+        Some(n) => {
+            let (suffix_after_matched_pair, _) =
+                context("nested marked section pair", marked_section_body_ignore)(
+                    input.slice(n + MARKED_SECTION_START.len()..),
+                )?;
             let (final_suffix, _) = marked_section_body_ignore(suffix_after_matched_pair)?;
             Ok((
                 final_suffix,
-                input.slice(..input.len() - final_suffix.len() - END.len()),
+                input.slice(..input.len() - final_suffix.len() - MARKED_SECTION_END.len()),
             ))
         }
         _ => Ok((close_suffix, close_match)),
@@ -146,7 +148,7 @@ pub fn marked_section_end<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    tag("]]>")(input)
+    tag(MARKED_SECTION_END)(input)
 }
 
 /// Matches a processing instruction (`<?example>`) and outputs it.
@@ -412,36 +414,36 @@ mod tests {
     #[test]
     fn test_marked_section_start() {
         assert_eq!(
-            marked_section_start_and_keyword::<E>("<![IGNORE [ lkjsdflkj sdflkj sdflkj  ]]>"),
+            marked_section_start_and_keywords::<E>("<![IGNORE [ lkjsdflkj sdflkj sdflkj  ]]>"),
             Ok((" lkjsdflkj sdflkj sdflkj  ]]>", "IGNORE"))
         );
         assert_eq!(
-            marked_section_start_and_keyword::<E>("<![ %Some.Condition[<x></x>]]>"),
+            marked_section_start_and_keywords::<E>("<![ %Some.Condition[<x></x>]]>"),
             Ok(("<x></x>]]>", "%Some.Condition"))
         );
         assert_eq!(
-            marked_section_start_and_keyword::<E>("<![CDATA[Hello]] world]]>"),
+            marked_section_start_and_keywords::<E>("<![CDATA[Hello]] world]]>"),
             Ok(("Hello]] world]]>", "CDATA"))
         );
         assert_eq!(
-            marked_section_start_and_keyword::<E>("<![ %cond;[ ]]>"),
+            marked_section_start_and_keywords::<E>("<![ %cond;[ ]]>"),
             Ok((" ]]>", "%cond;"))
         );
         assert_eq!(
-            marked_section_start_and_keyword::<E>("<![ RCDATA TEMP [ "),
+            marked_section_start_and_keywords::<E>("<![ RCDATA TEMP [ "),
             Ok((" ", "RCDATA TEMP"))
         );
         assert_eq!(
-            marked_section_start_and_keyword::<E>("<![[]>]]]]]>"),
+            marked_section_start_and_keywords::<E>("<![[]>]]]]]>"),
             Ok(("]>]]]]]>", ""))
         );
         assert_eq!(
-            marked_section_start_and_keyword::<E>("<![ [abc]]>"),
+            marked_section_start_and_keywords::<E>("<![ [abc]]>"),
             Ok(("abc]]>", ""))
         );
-        marked_section_start_and_keyword::<E>("<![ IGNORE <").unwrap_err();
-        marked_section_start_and_keyword::<E>("<![ IGNORE >").unwrap_err();
-        marked_section_start_and_keyword::<E>("<![ IGNORE ]]>").unwrap_err();
+        marked_section_start_and_keywords::<E>("<![ IGNORE <").unwrap_err();
+        marked_section_start_and_keywords::<E>("<![ IGNORE >").unwrap_err();
+        marked_section_start_and_keywords::<E>("<![ IGNORE ]]>").unwrap_err();
     }
 
     #[test]

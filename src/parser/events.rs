@@ -81,6 +81,8 @@ where
     })(input)
 }
 
+/// Matches an entire marked section declaration and
+/// produces events according to [`ParserConfig::marked_section_handling`].
 pub fn marked_section_declaration<'a, E>(
     input: &'a str,
     config: &ParserConfig,
@@ -89,7 +91,7 @@ where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
 {
     context("marked section declaration", |input| {
-        let (rest, raw_status_keywords) = raw::marked_section_start_and_keyword(input)?;
+        let (rest, raw_status_keywords) = raw::marked_section_start_and_keywords(input)?;
         let status_keywords = config.parse_markup_declaration_text(raw_status_keywords)?;
 
         let status = match config
@@ -116,6 +118,8 @@ where
     })(input)
 }
 
+/// Matches the marked section + end inside a marked section declaration and
+/// produces events according to [`ParserConfig::marked_section_handling`].
 pub fn marked_section_body<'a, E>(
     input: &'a str,
     status_keywords: Cow<'a, str>,
