@@ -76,9 +76,8 @@ where
 /// A deserializer for SGML content.
 #[derive(Debug)]
 pub struct SgmlDeserializer<'de> {
-    events: Vec<SgmlEvent<'de>>,
-    pos: usize,
-    stack: Vec<usize>,
+    events: std::vec::IntoIter<SgmlEvent<'de>>,
+    stack: Vec<Cow<'de, str>>,
     map_key: Option<String>,
     accumulated_text: Option<Cow<'de, str>>,
 }
@@ -116,8 +115,7 @@ pub enum DeserializationError {
 impl<'de> SgmlDeserializer<'de> {
     pub fn from_fragment(fragment: SgmlFragment<'de>) -> Result<Self, DeserializationError> {
         let mut reader = SgmlDeserializer {
-            events: fragment.into_vec(),
-            pos: 0,
+            events: fragment.into_vec().into_iter(),
             stack: Vec::new(),
             map_key: None,
             accumulated_text: None,
@@ -126,11 +124,10 @@ impl<'de> SgmlDeserializer<'de> {
         Ok(reader)
     }
 
-    fn advance(&mut self) -> Result<(), DeserializationError> {
-        if self.pos < self.events.len() {
-            self.pos += 1;
+    fn advance(&mut self) -> Result<SgmlEvent<'de>, DeserializationError> {
+        if let Some(next) = self.events.next() {
             self.normalize_at_cursor()?;
-            Ok(())
+            Ok(next)
         } else {
             Err(DeserializationError::UnexpectedEof)
         }
@@ -139,7 +136,8 @@ impl<'de> SgmlDeserializer<'de> {
     fn peek(&self) -> Result<&SgmlEvent<'de>, DeserializationError> {
         let current = self
             .events
-            .get(self.pos)
+            .as_slice()
+            .get(0)
             .ok_or(DeserializationError::UnexpectedEof)?;
         trace!("peeked: {:?}", current);
         Ok(current)
@@ -148,7 +146,8 @@ impl<'de> SgmlDeserializer<'de> {
     fn peek_mut(&mut self) -> Result<&mut SgmlEvent<'de>, DeserializationError> {
         let current = self
             .events
-            .get_mut(self.pos)
+            .as_mut_slice()
+            .get_mut(0)
             .ok_or(DeserializationError::UnexpectedEof)?;
         trace!("peeked: {:?}", current);
         Ok(current)
@@ -156,8 +155,11 @@ impl<'de> SgmlDeserializer<'de> {
 
     fn peek_content_type(&self) -> Result<PeekContentType, DeserializationError> {
         let mut contains_text = false;
-        let contains_child_elements = self.events[self.pos + 1..]
+        let contains_child_elements = self
+            .events
+            .as_slice()
             .iter()
+            .skip(1)
             .find_map(|event| match event {
                 SgmlEvent::OpenStartTag(_) => Some(true),
                 SgmlEvent::EndTag(_) => Some(false),
@@ -180,25 +182,20 @@ impl<'de> SgmlDeserializer<'de> {
     /// Rejects unsupported events (like empty start tags), ignores markup declarations and processing instructions,
     /// and ensures any `Data` is expanded
     fn normalize_at_cursor(&mut self) -> Result<(), DeserializationError> {
-        fn consume(event: &mut SgmlEvent) -> SgmlEvent<'static> {
-            mem::replace(event, SgmlEvent::ProcessingInstruction("*CONSUMED*".into())).into_owned()
-        }
-
-        let event = match self.events.get_mut(self.pos) {
+        let event = match self.events.as_mut_slice().get_mut(0) {
             Some(event) => event,
             None => return Ok(()),
         };
         match event {
             SgmlEvent::MarkupDeclaration(_)
             | SgmlEvent::ProcessingInstruction(_)
-            | SgmlEvent::MarkedSection { .. } => {
-                Err(DeserializationError::Unsupported(consume(event)))
-            }
-            SgmlEvent::OpenStartTag(name) | SgmlEvent::EndTag(name) if name.is_empty() => {
-                Err(DeserializationError::Unsupported(consume(event)))
-            }
-            _ => Ok(()),
+            | SgmlEvent::MarkedSection { .. } => {}
+            SgmlEvent::OpenStartTag(name) | SgmlEvent::EndTag(name) if name.is_empty() => {}
+            _ => return Ok(()),
         }
+        Err(DeserializationError::Unsupported(
+            self.events.next().unwrap().into_owned(),
+        ))
     }
 
     fn expect_start_tag(&self) -> Result<&Cow<'de, str>, DeserializationError> {
@@ -208,23 +205,16 @@ impl<'de> SgmlDeserializer<'de> {
         }
     }
 
-    fn tag_at_stack_pos(&self, pos: usize) -> Option<&Cow<'de, str>> {
-        self.stack.get(pos).map(|n| match &self.events[*n] {
-            SgmlEvent::OpenStartTag(name) => name,
-            x => unreachable!("{:?} was pushed to stack", x),
-        })
-    }
-
     /// Consumes the current event, asserting it is an open tag, and pushes it to the stack.
     fn push_elt(&mut self) -> Result<&str, DeserializationError> {
-        let stag = self.expect_start_tag()?;
+        let stag = match self.events.next() {
+            Some(SgmlEvent::OpenStartTag(name)) => name,
+            _ => return Err(DeserializationError::ExpectedStartTag),
+        };
         debug!("push({}): {:?}", self.stack.len(), stag);
-        self.stack.push(self.pos);
-        self.advance()?;
-        match self.events.get(self.pos - 1) {
-            Some(SgmlEvent::OpenStartTag(name)) => Ok(name),
-            _ => unreachable!(),
-        }
+        self.stack.push(stag);
+        self.normalize_at_cursor()?;
+        Ok(self.stack.last().unwrap())
     }
 
     /// Consumes all events until the current top of the stack is popped.
@@ -233,38 +223,35 @@ impl<'de> SgmlDeserializer<'de> {
         trace!(
             "popping({}): {:?}",
             stack_size - 1,
-            self.tag_at_stack_pos(stack_size - 1).unwrap()
+            &self.stack[stack_size - 1]
         );
         loop {
-            match self.peek()? {
+            match self
+                .events
+                .next()
+                .ok_or(DeserializationError::UnexpectedEof)?
+            {
                 SgmlEvent::XmlCloseEmptyElement => {
                     self.stack.pop();
-                    self.advance()?;
                     return Ok(());
                 }
                 SgmlEvent::EndTag(name) => {
                     self.check_stack_size(stack_size);
-                    let expected = self.tag_at_stack_pos(stack_size - 1).unwrap();
+                    let expected = self.stack.pop().unwrap();
                     if name != expected {
                         return Err(DeserializationError::MismatchedCloseTag {
                             expected: expected.to_string(),
                             found: name.to_string(),
                         });
                     }
-                    debug!(
-                        "popped({}): {:?}",
-                        stack_size - 1,
-                        self.tag_at_stack_pos(stack_size - 1).unwrap()
-                    );
-                    self.stack.pop();
-                    self.advance()?;
+                    debug!("popped({}): {:?}", stack_size, name);
                     return Ok(());
                 }
-                SgmlEvent::OpenStartTag(_) => {
-                    self.push_elt()?;
+                SgmlEvent::OpenStartTag(name) => {
+                    self.stack.push(name);
                     self.pop_elt()?;
                 }
-                _ => self.advance()?,
+                _ => {}
             };
         }
     }
@@ -273,12 +260,10 @@ impl<'de> SgmlDeserializer<'de> {
     ///
     /// Should only be used immediately after `push_elt`.
     fn advance_to_content(&mut self) -> Result<(), DeserializationError> {
-        loop {
-            match self.peek()? {
-                SgmlEvent::Attribute(..) | SgmlEvent::CloseStartTag => self.advance()?,
-                _ => return Ok(()),
-            }
+        while let SgmlEvent::Attribute(..) | SgmlEvent::CloseStartTag = self.peek()? {
+            self.advance()?;
         }
+        Ok(())
     }
 
     /// Consumes an element and returns all its text.
@@ -317,10 +302,12 @@ impl<'de> SgmlDeserializer<'de> {
                     }
                 }
                 SgmlEvent::Character(t) => {
-                    text.push_cow(t);
+                    text.push_cow(mem::take(t));
                     self.advance()?;
                 }
-                _ => self.advance()?,
+                _ => {
+                    self.advance()?;
+                }
             }
         }
 
@@ -358,11 +345,7 @@ impl<'de> SgmlDeserializer<'de> {
             } else {
                 "removed"
             },
-            delta = stack
-                .iter()
-                .skip(expected_size)
-                .map(|i| &self.events[*i])
-                .collect::<Vec<_>>(),
+            delta = stack.iter().skip(expected_size).collect::<Vec<_>>(),
         );
     }
 }
@@ -771,10 +754,11 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
                     ContentStrategy::TextOnly => unreachable!(),
                 },
                 SgmlEvent::Character(text) => {
+                    let text = mem::take(text);
+                    self.de.advance()?;
                     if let Some(value_acc) = &mut self.text_content {
                         value_acc.push_cow(text);
                     }
-                    self.de.advance()?;
                     continue;
                 }
                 SgmlEvent::ProcessingInstruction(_)
