@@ -66,6 +66,25 @@ where
     )(input)
 }
 
+fn declaration_subset<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+where
+    E: ParseError<&'a str> + ContextError<&'a str>,
+{
+    context(
+        "declaration subset",
+        delimited(
+            char('['),
+            recognize(many0_count(alt((
+                quoted_attribute_value,
+                declaration_subset,
+                markup_declaration,
+                is_not("<>\"'[]"),
+            )))),
+            cut(char(']')),
+        ),
+    )(input)
+}
+
 /// Matches `<![foo[` and outputs `foo`.
 pub fn marked_section_start_and_keyword<'a, E>(input: &'a str) -> IResult<&str, &str, E>
 where
@@ -128,25 +147,6 @@ where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     tag("]]>")(input)
-}
-
-fn declaration_subset<'a, E>(input: &'a str) -> IResult<&str, &str, E>
-where
-    E: ParseError<&'a str> + ContextError<&'a str>,
-{
-    context(
-        "declaration subset",
-        recognize(delimited(
-            char('['),
-            many0_count(alt((
-                quoted_attribute_value,
-                declaration_subset,
-                markup_declaration,
-                is_not("<>\"'[]"),
-            ))),
-            cut(char(']')),
-        )),
-    )(input)
 }
 
 /// Matches a processing instruction (`<?example>`) and outputs it.
