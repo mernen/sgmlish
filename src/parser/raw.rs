@@ -16,7 +16,7 @@ use crate::is_sgml_whitespace;
 use super::util::{spaces, strip_spaces_after, strip_spaces_around, take_until_terminated};
 
 /// Matches an entire comment declaration (`<!-- example -->`) and outputs it.
-pub fn comment_declaration<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn comment_declaration<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -33,7 +33,7 @@ where
 
 /// Matches a comment (`-- example --`) within a comment declaration or markup declaration
 /// and outputs what's between the delimiters.
-pub fn comment<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn comment<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -44,7 +44,7 @@ where
 }
 
 /// Matches an entire markup declaration (`<!DOCTYPE example>`) and outputs it.
-pub fn markup_declaration<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn markup_declaration<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -66,7 +66,7 @@ where
     )(input)
 }
 
-fn declaration_subset<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+fn declaration_subset<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -109,7 +109,7 @@ where
 /// immediately after [`marked_section_start_and_keywords`].
 ///
 /// These sections do nest, meaning they end on the first `]]>` found.
-pub fn marked_section_body_character<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn marked_section_body_character<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -121,7 +121,7 @@ where
 ///
 /// The content of `IGNORE` marked sections will match `<![` and `]]>` pairs,
 /// stopping on the first unmatched `]]>` found.
-pub fn marked_section_body_ignore<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn marked_section_body_ignore<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -144,7 +144,7 @@ where
 }
 
 /// Matches `]]>` and outputs it.
-pub fn marked_section_end<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn marked_section_end<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -152,7 +152,7 @@ where
 }
 
 /// Matches a processing instruction (`<?example>`) and outputs it.
-pub fn processing_instruction<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn processing_instruction<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -160,13 +160,13 @@ where
         "processing instruction",
         recognize(preceded(
             tag("<?"),
-            take_until_terminated(r#"processing instruction end (">")"#, ">"),
+            take_until_terminated(r##"processing instruction end (">")"##, ">"),
         )),
     )(input)
 }
 
 /// Matches character sequences.
-pub fn text<'a, E>(input: &'a str, mse: MarkedSectionEndHandling) -> IResult<&str, &str, E>
+pub fn text<'a, E>(input: &'a str, mse: MarkedSectionEndHandling) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -191,7 +191,10 @@ where
 }
 
 /// Matches until the first `<` (or `]]>` in [`MarkedSectionEndHandling::StopParsing`] mode).
-pub fn plain_text<'a, E>(input: &'a str, mse: MarkedSectionEndHandling) -> IResult<&str, &str, E>
+pub fn plain_text<'a, E>(
+    input: &'a str,
+    mse: MarkedSectionEndHandling,
+) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -224,7 +227,7 @@ pub enum MarkedSectionEndHandling {
 }
 
 /// Matches `<foo` and outputs `foo`.
-pub fn open_start_tag<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn open_start_tag<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -232,7 +235,7 @@ where
 }
 
 /// Matches `>` and outputs it.
-pub fn close_start_tag<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn close_start_tag<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -240,7 +243,7 @@ where
 }
 
 /// Matches `/>` and outputs it.
-pub fn xml_close_empty_element<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn xml_close_empty_element<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -248,7 +251,7 @@ where
 }
 
 /// Matches `<>` and outputs it.
-pub fn empty_start_tag<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn empty_start_tag<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -256,7 +259,7 @@ where
 }
 
 /// Matches an attribute key-value pair and outputs the key and value (without quotes).
-pub fn attribute<'a, E>(input: &'a str) -> IResult<&str, (&str, Option<&str>), E>
+pub fn attribute<'a, E>(input: &'a str) -> IResult<&'a str, (&'a str, Option<&'a str>), E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -292,7 +295,7 @@ where
 
 /// Matches either a [quoted](quoted_attribute_value) or
 /// [unquoted attribute value](unquoted_attribute_value).
-pub fn attribute_value<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn attribute_value<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -300,7 +303,7 @@ where
 }
 
 /// Matches an unquoted attribute value and outputs it.
-pub fn unquoted_attribute_value<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn unquoted_attribute_value<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -321,7 +324,7 @@ where
 }
 
 /// Matches `</foo>` and outputs `foo`.
-pub fn end_tag<'a, E>(input: &'a str) -> IResult<&str, Option<&str>, E>
+pub fn end_tag<'a, E>(input: &'a str) -> IResult<&'a str, Option<&'a str>, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -332,7 +335,7 @@ where
 }
 
 /// Matches a name according to HTML4's definition.
-pub fn name<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn name<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -340,7 +343,7 @@ where
 }
 
 /// Matches the first character of a name according to HTML4's definition.
-pub fn name_start<'a, E>(input: &'a str) -> IResult<&str, &str, E>
+pub fn name_start<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
