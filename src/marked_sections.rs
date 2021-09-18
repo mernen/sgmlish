@@ -2,8 +2,6 @@
 
 use std::str::FromStr;
 
-use crate::parser::ParseError;
-
 const KEYWORDS: &[(&str, MarkedSectionStatus)] = &[
     ("CDATA", MarkedSectionStatus::CData),
     ("RCDATA", MarkedSectionStatus::RcData),
@@ -57,17 +55,6 @@ impl FromStr for MarkedSectionStatus {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct ParseMarkedSectionStatusError;
-
-/// The error type when expanding a marked section goes wrong.
-#[derive(Debug)]
-pub enum ExpandMarkedSectionError<'a, E> {
-    /// An invalid status keyword was found in a marked section.
-    InvalidStatusKeyword(&'a str),
-    /// A valid status keyword was found, but the parser is not configured to accept it.
-    RejectedStatusKeyword(&'a str),
-    /// An error occurred while parsing the contents of an `INCLUDE` marked section.
-    ParseError(ParseError<&'a str, E>),
-}
 
 #[cfg(test)]
 mod tests {

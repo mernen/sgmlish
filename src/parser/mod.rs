@@ -2,16 +2,16 @@
 
 use std::borrow::Cow;
 use std::fmt;
-use std::ops::Deref;
 
 use crate::marked_sections::MarkedSectionStatus;
 use crate::{entities, text, SgmlFragment};
 
+mod error;
 pub mod events;
 pub mod raw;
 pub mod util;
 
-pub(crate) type DefaultErrorType<I> = nom::error::VerboseError<I>;
+pub use error::*;
 
 /// Parses the given string using a [`Parser`] with default settings,
 /// then yielding an [`SgmlFragment`].
@@ -60,28 +60,27 @@ impl Parser {
     }
 
     /// Parses the given input.
+    ///
+    /// Parse errors are flattened into a descriptive string.
+    /// To capture the full error, use [`parse_with_detailed_errors`](Parser::parse_with_detailed_errors).
     pub fn parse<'a>(&self, input: &'a str) -> crate::Result<SgmlFragment<'a>> {
-        Ok(self.parse_with_error_type(input)?)
+        self.parse_with_detailed_errors::<ContextualizedError<_>>(input)
+            .map_err(|err| crate::Error::ParseError(err.describe(&input)))
     }
 
-    /// Parses the given input, using a different error handler for parser errors.
+    /// Parses the given input, using a different error handler for parser errors,
+    /// and capturing the full error type.
     ///
     /// Different [`nom`] error handlers may be used to adjust between speed and
     /// level of detail in error messages.
-    pub fn parse_with_error_type<'a, E>(
-        &self,
-        input: &'a str,
-    ) -> Result<SgmlFragment<'a>, ParseError<&'a str, E>>
+    pub fn parse_with_detailed_errors<'a, E>(&self, input: &'a str) -> Result<SgmlFragment<'a>, E>
     where
         E: nom::error::ParseError<&'a str>
             + nom::error::ContextError<&'a str>
-            + nom::error::FromExternalError<&'a str, crate::Error>
-            + fmt::Display,
+            + nom::error::FromExternalError<&'a str, crate::Error>,
     {
         use nom::Finish;
-        let (rest, events) = events::document_entity::<E>(input, &self.config)
-            .finish()
-            .map_err(|error| ParseError::from_nom(input, error))?;
+        let (rest, events) = events::document_entity::<E>(input, &self.config).finish()?;
         debug_assert!(rest.is_empty(), "document_entity should be all_consuming");
 
         let events = events.collect::<Vec<_>>();
@@ -371,48 +370,3 @@ impl fmt::Debug for Ellipsis {
         f.write_str("...")
     }
 }
-
-/// The error type for parse errors.
-///
-/// This error contains a reference to the original input string;
-/// when converted to the more general [`Error`] type, this link is lost,
-/// and only a description of the original error is kept.
-///
-/// [`Error`]: crate::Error
-#[derive(Debug)]
-pub struct ParseError<I, E> {
-    input: I,
-    error: E,
-}
-
-impl<I, E> ParseError<I, E>
-where
-    I: Deref<Target = str>,
-    E: nom::error::ParseError<I>,
-{
-    pub(crate) fn from_nom(input: I, error: E) -> Self {
-        ParseError { input, error }
-    }
-
-    /// Returns the original input for this error.
-    pub fn input(&self) -> &str {
-        &self.input
-    }
-
-    /// Returns the internal error produced by the parsing functions.
-    pub fn into_inner(self) -> E {
-        self.error
-    }
-}
-
-impl fmt::Display for ParseError<&str, DefaultErrorType<&str>> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&nom::error::convert_error(self.input, self.error.clone()))
-    }
-}
-
-// impl<I: Deref<Target = str>, E: fmt::Display> fmt::Display for ParseError<I, E> {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         fmt::Display::fmt(&self.error, f)
-//     }
-// }
