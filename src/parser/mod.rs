@@ -106,6 +106,38 @@ pub struct ParserConfig {
 
 type EntityFn = Box<dyn Fn(&str) -> Option<Cow<'static, str>>>;
 
+impl ParserConfig {
+    /// Trims the given text according to the configured rules.
+    pub fn trim<'a>(&self, text: &'a str) -> &'a str {
+        if self.trim_whitespace {
+            text.trim_matches(text::is_sgml_whitespace)
+        } else {
+            text
+        }
+    }
+
+    /// Parses the given replaceable character data, returning its final form.
+    pub fn parse_rcdata<'a, E>(&self, rcdata: &'a str) -> Result<Cow<'a, str>, nom::Err<E>>
+    where
+        E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
+    {
+        let f = self.entity_fn.as_deref().unwrap_or(&|_| None);
+        entities::expand_entities(rcdata, f).map_err(|err| into_nom_failure(rcdata, err))
+    }
+
+    /// Parses parameter entities in the given markup declaration text, returning its final form.
+    pub fn parse_markup_declaration_text<'a, E>(
+        &self,
+        text: &'a str,
+    ) -> Result<Cow<'a, str>, nom::Err<E>>
+    where
+        E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
+    {
+        let f = self.parameter_entity_fn.as_deref().unwrap_or(&|_| None);
+        entities::expand_parameter_entities(text, f).map_err(|err| into_nom_failure(text, err))
+    }
+}
+
 /// How tag and attribute names should be handled.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NameNormalization {
@@ -178,45 +210,13 @@ impl MarkedSectionHandling {
     }
 }
 
-impl ParserConfig {
-    /// Trims the given text according to the configured rules.
-    pub fn trim<'a>(&self, text: &'a str) -> &'a str {
-        if self.trim_whitespace {
-            text.trim_matches(text::is_sgml_whitespace)
-        } else {
-            text
-        }
-    }
-
-    /// Parses the given replaceable character data, returning its final form.
-    pub fn parse_rcdata<'a, E>(&self, rcdata: &'a str) -> Result<Cow<'a, str>, nom::Err<E>>
-    where
-        E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
-    {
-        let f = self.entity_fn.as_deref().unwrap_or(&|_| None);
-        entities::expand_entities(rcdata, f).map_err(|err| into_nom_failure(rcdata, err))
-    }
-
-    /// Parses parameter entities in the given markup declaration text, returning its final form.
-    pub fn parse_markup_declaration_text<'a, E>(
-        &self,
-        text: &'a str,
-    ) -> Result<Cow<'a, str>, nom::Err<E>>
-    where
-        E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
-    {
-        let f = self.parameter_entity_fn.as_deref().unwrap_or(&|_| None);
-        entities::expand_parameter_entities(text, f).map_err(|err| into_nom_failure(text, err))
-    }
-}
-
 fn into_nom_failure<'a, E>(input: &'a str, err: entities::EntityError) -> nom::Err<E>
 where
     E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
 {
     use nom::Slice;
     let slice = input.slice(err.position..);
-    nom::Err::Failure(E::add_context(
+    nom::Err::Error(E::add_context(
         slice,
         if slice.starts_with("&#") {
             "character reference"
@@ -289,6 +289,33 @@ impl ParserBuilder {
     }
 
     /// Defines a closure to be used to resolve entities.
+    ///
+    /// For information on this closure, see [`entities::expand_entities`].
+    ///
+    /// # Example
+    ///
+    /// Building a parser that supports OFX entities:
+    ///
+    /// ```rust
+    /// # fn main() -> sgmlish::Result<()> {
+    /// let parser = sgmlish::Parser::builder()
+    ///     .expand_entities(|entity| match entity {
+    ///         "lt" => Some("<"),
+    ///         "gt" => Some(">"),
+    ///         "amp" => Some("&"),
+    ///         "nbsp" => Some(" "),
+    ///         _ => None,
+    ///     })
+    ///     .build();
+    ///
+    /// let input = r##"
+    ///     <MEMO>Sonic &amp; Knuckles</MEMO>
+    /// "##;
+    /// let sgml = parser.parse(input)?;
+    /// assert_eq!(sgml.as_slice()[2], sgmlish::SgmlEvent::Character("Sonic & Knuckles".into()));
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn expand_entities<F, T>(mut self, f: F) -> Self
     where
         F: Fn(&str) -> Option<T> + 'static,
@@ -298,7 +325,10 @@ impl ParserBuilder {
         self
     }
 
-    /// Defines a closure to be used to resolve entities.
+    /// Defines a closure to be used to resolve parameter entities.
+    ///
+    /// For information on parameter entities and the closure,
+    /// see [`entities::expand_parameter_entities`].
     pub fn expand_parameter_entities<F, T>(mut self, f: F) -> Self
     where
         F: Fn(&str) -> Option<T> + 'static,
@@ -372,6 +402,27 @@ impl fmt::Debug for Ellipsis {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_config_trim() {
+        let config = ParserConfig::default();
+        assert_eq!(config.trim(" hello "), "hello");
+
+        let config = Parser::builder().trim_whitespace(true).into_config();
+        assert_eq!(config.trim(" hello "), "hello");
+
+        let config = Parser::builder().trim_whitespace(false).into_config();
+        assert_eq!(config.trim(" hello "), " hello ");
+    }
+
+    #[test]
+    fn test_config_parse_rcdata() {
+        let config = ParserConfig::default();
+        match config.parse_rcdata::<nom::error::Error<_>>("hello &x; world") {
+            Err(nom::Err::Error(err)) => assert_eq!(err.input, "&x; world"),
+            err => panic!("expected nom::Err::Error, got: {:?}", err),
+        };
+    }
 
     #[test]
     fn test_name_normalization_unchanged() {
