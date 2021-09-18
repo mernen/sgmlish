@@ -73,9 +73,12 @@ pub fn markup_declaration<'a, E>(
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    map(raw::markup_declaration, |s| {
+    map(raw::markup_declaration, |(keyword, body)| {
         EventIter::cond(!config.ignore_markup_declarations, || {
-            SgmlEvent::MarkupDeclaration(Cow::from(s))
+            SgmlEvent::MarkupDeclaration {
+                keyword: keyword.into(),
+                body: body.into(),
+            }
         })
     })(input)
 }
@@ -480,10 +483,14 @@ mod tests {
 
         assert_eq!(
             events.next(),
-            Some(MarkupDeclaration(
-                "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\"\n                \"http://www.w3.org/TR/html4/strict.dtd\">"
-                    .into()
-            ))
+            Some(MarkupDeclaration {
+                keyword: "DOCTYPE".into(),
+                body: concat!(
+                    "HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\"\n",
+                    "                \"http://www.w3.org/TR/html4/strict.dtd\""
+                )
+                .into(),
+            })
         );
 
         assert_eq!(events.next(), Some(OpenStartTag("HTML".into())));
@@ -580,7 +587,10 @@ mod tests {
         assert_eq!(rest, "<!SGML>");
         assert_eq!(
             events.next(),
-            Some(SgmlEvent::MarkupDeclaration(r##"<!DOCTYPE HTML>"##.into()))
+            Some(SgmlEvent::MarkupDeclaration {
+                keyword: "DOCTYPE".into(),
+                body: "HTML".into(),
+            })
         );
         assert_eq!(events.next(), None);
 

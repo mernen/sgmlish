@@ -74,7 +74,7 @@ fn reindent(fragment: SgmlFragment) -> SgmlFragment {
             SgmlEvent::OpenStartTag(_)
             | SgmlEvent::Character(_)
             | SgmlEvent::ProcessingInstruction(_)
-            | SgmlEvent::MarkupDeclaration(_) => {
+            | SgmlEvent::MarkupDeclaration { .. } => {
                 transform.insert_at(i, indent(indent_level));
             }
             SgmlEvent::CloseStartTag => indent_level += 1,

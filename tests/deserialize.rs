@@ -421,7 +421,8 @@ fn test_reject_markup_declarations() {
     let err = sgmlish::from_fragment::<Test>(sgml).unwrap_err();
     assert!(matches!(
         err,
-        DeserializationError::Unsupported(SgmlEvent::MarkupDeclaration(md)) if md == "<!DOCTYPE test>"
+        DeserializationError::Unsupported(SgmlEvent::MarkupDeclaration { keyword, body })
+            if keyword == "DOCTYPE" && body == "test"
     ));
 }
 

@@ -40,7 +40,10 @@ pub enum SgmlEvent<'a> {
     /// A markup declaration, like `<!SGML ...>` or `<!DOCTYPE ...>`.
     ///
     /// Markup declarations that are purely comments are ignored.
-    MarkupDeclaration(Cow<'a, str>),
+    MarkupDeclaration {
+        keyword: Cow<'a, str>,
+        body: Cow<'a, str>,
+    },
     /// A processing instruction, e.g. `<?EXAMPLE>`
     ProcessingInstruction(Cow<'a, str>),
     /// A marked section, like `<![IGNORE[...]]>`.
@@ -71,7 +74,10 @@ pub enum SgmlEvent<'a> {
 impl<'a> SgmlEvent<'a> {
     pub fn into_owned(self) -> SgmlEvent<'static> {
         match self {
-            SgmlEvent::MarkupDeclaration(s) => SgmlEvent::MarkupDeclaration(make_owned(s)),
+            SgmlEvent::MarkupDeclaration { keyword, body } => SgmlEvent::MarkupDeclaration {
+                keyword: make_owned(keyword),
+                body: make_owned(body),
+            },
             SgmlEvent::ProcessingInstruction(s) => SgmlEvent::ProcessingInstruction(make_owned(s)),
             Self::MarkedSection {
                 status_keywords,
@@ -95,9 +101,14 @@ impl<'a> SgmlEvent<'a> {
 impl fmt::Display for SgmlEvent<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            SgmlEvent::MarkupDeclaration(decl) | SgmlEvent::ProcessingInstruction(decl) => {
-                f.write_str(decl)
+            SgmlEvent::MarkupDeclaration { keyword, body } => {
+                write!(f, "<!{}", keyword)?;
+                if !body.is_empty() {
+                    write!(f, " {}", body)?;
+                }
+                f.write_str(">")
             }
+            SgmlEvent::ProcessingInstruction(decl) => f.write_str(decl),
             SgmlEvent::MarkedSection {
                 status_keywords,
                 section,
@@ -139,8 +150,24 @@ mod tests {
     fn test_event_display() {
         use super::SgmlEvent::*;
         assert_eq!(
-            format!("{}", MarkupDeclaration("<?DOCTYPE HTML?>".into())),
-            "<?DOCTYPE HTML?>"
+            format!(
+                "{}",
+                MarkupDeclaration {
+                    keyword: "DOCTYPE".into(),
+                    body: "HTML".into(),
+                },
+            ),
+            "<!DOCTYPE HTML>"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                MarkupDeclaration {
+                    keyword: "foo".into(),
+                    body: "".into(),
+                },
+            ),
+            "<!foo>"
         );
         assert_eq!(
             format!("{}", ProcessingInstruction("<?IS10744 FSIDR myurl>".into())),

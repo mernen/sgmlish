@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use sgmlish::{Parser, SgmlEvent};
 
 const SGML: &str = r##"
@@ -18,6 +20,11 @@ const SGML: &str = r##"
     </TEST>
 "##;
 
+const DOCTYPE: SgmlEvent = SgmlEvent::MarkupDeclaration {
+    keyword: Cow::Borrowed("DOCTYPE"),
+    body: Cow::Borrowed("test"),
+};
+
 #[test]
 fn test_include_trim_whitespace() {
     let mut events = Parser::builder()
@@ -30,10 +37,7 @@ fn test_include_trim_whitespace() {
         .unwrap()
         .into_iter();
 
-    assert_eq!(
-        events.next(),
-        Some(SgmlEvent::MarkupDeclaration("<!DOCTYPE test>".into()))
-    );
+    assert_eq!(events.next(), Some(DOCTYPE));
 
     assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
@@ -80,10 +84,7 @@ fn test_include_keep_whitespace() {
         .unwrap()
         .into_iter();
 
-    assert_eq!(
-        events.next(),
-        Some(SgmlEvent::MarkupDeclaration("<!DOCTYPE test>".into()))
-    );
+    assert_eq!(events.next(), Some(DOCTYPE));
 
     assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
@@ -159,10 +160,7 @@ fn test_ignore_trim_whitespace() {
         .unwrap()
         .into_iter();
 
-    assert_eq!(
-        events.next(),
-        Some(SgmlEvent::MarkupDeclaration("<!DOCTYPE test>".into()))
-    );
+    assert_eq!(events.next(), Some(DOCTYPE));
 
     assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
@@ -194,10 +192,7 @@ fn test_cdata_trim_whitespace() {
         .unwrap()
         .into_iter();
 
-    assert_eq!(
-        events.next(),
-        Some(SgmlEvent::MarkupDeclaration("<!DOCTYPE test>".into()))
-    );
+    assert_eq!(events.next(), Some(DOCTYPE));
 
     assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
@@ -249,10 +244,7 @@ fn test_keep_unmodified_include_trim_whitespace() {
         .unwrap()
         .into_iter();
 
-    assert_eq!(
-        events.next(),
-        Some(SgmlEvent::MarkupDeclaration("<!DOCTYPE test>".into()))
-    );
+    assert_eq!(events.next(), Some(DOCTYPE));
 
     assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
@@ -305,10 +297,7 @@ fn test_keep_unmodified_ignore_trim_whitespace() {
         .unwrap()
         .into_iter();
 
-    assert_eq!(
-        events.next(),
-        Some(SgmlEvent::MarkupDeclaration("<!DOCTYPE test>".into()))
-    );
+    assert_eq!(events.next(), Some(DOCTYPE));
 
     assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));

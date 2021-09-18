@@ -31,8 +31,7 @@ where
     )(input)
 }
 
-/// Matches a comment (`-- example --`) within a comment declaration or markup declaration
-/// and outputs what's between the delimiters.
+/// Matches `-- example --` and outputs `  example  `.
 pub fn comment<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -43,26 +42,30 @@ where
     )(input)
 }
 
-/// Matches an entire markup declaration (`<!DOCTYPE example>`) and outputs it.
-pub fn markup_declaration<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
+/// Matches `<!DOCTYPE example>` and outputs `("DOCTYPE", "example")`.
+pub fn markup_declaration<'a, E>(input: &'a str) -> IResult<&'a str, (&'a str, &'a str), E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     context(
         "markup declaration",
-        recognize(tuple((
-            tag("<!"),
-            name,
-            cut(many0_count(alt((
-                comment,
-                quoted_attribute_value,
-                declaration_subset,
-                // Accept single "-"
-                terminated(tag("-"), not(tag("-"))),
-                is_not("<>\"'[-"),
-            )))),
-            cut(char('>')),
-        ))),
+        tuple((
+            preceded(tag("<!"), name),
+            cut(terminated(
+                strip_spaces_around(recognize(many0_count(preceded(
+                    spaces,
+                    alt((
+                        comment,
+                        quoted_attribute_value,
+                        declaration_subset,
+                        // Accept single "-"
+                        terminated(tag("-"), not(tag("-"))),
+                        is_not("<>\"'[- \n\r\t"),
+                    )),
+                )))),
+                char('>'),
+            )),
+        )),
     )(input)
 }
 
@@ -75,10 +78,11 @@ where
         delimited(
             char('['),
             recognize(many0_count(alt((
+                comment,
                 quoted_attribute_value,
                 declaration_subset,
-                markup_declaration,
-                is_not("<>\"'[]"),
+                recognize(markup_declaration),
+                is_not("<>\"'[]-"),
             )))),
             cut(char(']')),
         ),
@@ -310,7 +314,7 @@ where
     preceded(peek(none_of("\"'")), is_not("\"'> \t\r\n"))(input)
 }
 
-/// Matches a quoted attribute value (`"example"` or `'example'`) and outputs its contents.
+/// Matches a quoted attribute value (`"example"` or `'example'`) and outputs its contents (`example`).
 pub fn quoted_attribute_value<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -388,26 +392,68 @@ mod tests {
 
     #[test]
     fn test_markup_declaration() {
-        fn accept(decl: &str) {
-            assert_eq!(markup_declaration::<E>(decl), Ok(("", decl)));
-        }
-
-        accept("<!DOCTYPE html>");
-        accept(
-            r#"<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">"#,
+        assert_eq!(
+            markup_declaration::<E>("<!DOCTYPE html>"),
+            Ok(("", ("DOCTYPE", "html")))
         );
-        accept("<!doctype doc [ <!element p - - ANY> ]>");
-        accept(
-            r##"<!ENTITY % HTMLsymbol PUBLIC
+        assert_eq!(markup_declaration::<E>("<!foo>"), Ok(("", ("foo", ""))));
+        assert_eq!(
+            markup_declaration::<E>(
+                r##"<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd"> "##,
+            ),
+            Ok((
+                " ",
+                (
+                    "DOCTYPE",
+                    r##"HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd""##
+                )
+            ))
+        );
+        assert_eq!(
+            markup_declaration::<E>("<!doctype doc [ <!element p - - ANY> ] >>"),
+            Ok((">", ("doctype", "doc [ <!element p - - ANY> ]")))
+        );
+        assert_eq!(
+            markup_declaration::<E>(
+                r##"<!ENTITY % HTMLsymbol PUBLIC
                 "-//W3C//ENTITIES Symbols//EN//HTML"
                 "HTMLsymbol.ent">"##,
+            ),
+            Ok((
+                "",
+                (
+                    "ENTITY",
+                    concat!(
+                        "% HTMLsymbol PUBLIC\n",
+                        "                \"-//W3C//ENTITIES Symbols//EN//HTML\"\n",
+                        "                \"HTMLsymbol.ent\""
+                    )
+                )
+            ))
         );
-        accept(r##"<!entity ccedil "ç">"##);
-        accept(
-            r##"<!ATTLIST (TH|TD)
-                %attrs;             -- this is a "comment --
-                foo %URI; #IMPLIED  -- don't match quotes here --
-            >"##,
+        assert_eq!(
+            markup_declaration::<E>(r##"<!entity ccedil "ç">"##),
+            Ok(("", ("entity", r##"ccedil "ç""##)))
+        );
+        assert_eq!(
+            markup_declaration::<E>(
+                r##"<!ATTLIST  (TH|TD)
+                    %attrs;             -- this is a "comment --
+                    foo %URI; #IMPLIED  -- don't match quotes here --
+                >
+                "##,
+            ),
+            Ok((
+                "\n                ",
+                (
+                    "ATTLIST",
+                    concat!(
+                        "(TH|TD)\n",
+                        "                    %attrs;             -- this is a \"comment --\n",
+                        "                    foo %URI; #IMPLIED  -- don't match quotes here --",
+                    )
+                )
+            ))
         );
 
         markup_declaration::<E>("<! doctype>").unwrap_err();
