@@ -3,7 +3,7 @@
 //! This is mainly based on <https://www.w3.org/MarkUp/SGML/productions.html>.
 
 use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag, take_till};
+use nom::bytes::complete::{is_not, tag, take_till, take_while};
 use nom::character::complete::{char, none_of, one_of, satisfy};
 use nom::combinator::{cut, map, map_parser, not, opt, peek, recognize, verify};
 use nom::error::{context, ContextError, ErrorKind, ParseError};
@@ -343,7 +343,7 @@ pub fn name<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    recognize(pair(name_start, many0_count(satisfy(is_name_char))))(input)
+    recognize(terminated(name_start, take_while(is_name_char)))(input)
 }
 
 /// Matches the first character of a name according to HTML4's definition.

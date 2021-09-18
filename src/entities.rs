@@ -4,13 +4,13 @@ use std::borrow::Cow;
 use std::char;
 
 use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::character::complete::{digit1, hex_digit1};
+use nom::bytes::complete::{tag, take_while1};
+use nom::character::complete::digit1;
 use nom::combinator::{consumed, map, opt, recognize};
 use nom::sequence::{preceded, terminated};
 use nom::IResult;
 
-use crate::parser::raw::name;
+use crate::parser::raw::{is_name_char, name};
 
 /// The type returned by expansion operations.
 pub type Result<T = ()> = std::result::Result<T, EntityError>;
@@ -160,7 +160,9 @@ fn char_ref(input: &str) -> IResult<&str, EntityRef> {
                 // Hex escape codes are actually only valid in XML
                 preceded(
                     tag("x"),
-                    map(hex_digit1, |code| u32::from_str_radix(code, 16).ok()),
+                    map(take_while1(is_name_char), |code| {
+                        u32::from_str_radix(code, 16).ok()
+                    }),
                 ),
             )),
         )),
@@ -215,6 +217,12 @@ mod tests {
     }
 
     #[test]
+    fn test_expand_character_references() {
+        let result = expand_character_references("f&#111o bar &#128523;");
+        assert_eq!(result, Ok("foo bar \u{1f60b}".into()));
+    }
+
+    #[test]
     fn test_expand_character_references_hex() {
         let result = expand_character_references("fo&#x6f; bar &#xFeFf;");
         assert_eq!(result, Ok("foo bar \u{feff}".into()));
@@ -248,10 +256,14 @@ mod tests {
 
     #[test]
     fn test_expand_entities_delegates_invalid_char_refs_to_closure() {
-        let result = expand_entities("test &#12345678&#x12345678 ok", |key| {
-            Some(format!("({})", key))
-        });
-        assert_eq!(result, Ok("test (#12345678)(#x12345678) ok".into()));
+        let result = expand_entities(
+            "test &#12345678&#x12345678 ok &#x &#xhello; &#xdeal",
+            |key| Some(format!("({})", key)),
+        );
+        assert_eq!(
+            result,
+            Ok("test (#12345678)(#x12345678) ok (#x) (#xhello) (#xdeal)".into())
+        );
     }
 
     #[test]
