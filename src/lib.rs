@@ -9,7 +9,6 @@ pub mod marked_sections;
 pub mod parser;
 pub mod text;
 pub mod transforms;
-mod util;
 
 use std::borrow::Cow;
 use std::fmt::{self, Write};
@@ -17,7 +16,6 @@ use std::fmt::{self, Write};
 pub use error::{Error, Result};
 pub use fragment::*;
 pub use parser::{parse, Parser, ParserConfig};
-use util::make_owned;
 
 #[cfg(feature = "serde")]
 pub mod de;
@@ -95,6 +93,13 @@ impl<'a> SgmlEvent<'a> {
             SgmlEvent::EndTag(name) => SgmlEvent::EndTag(make_owned(name)),
             SgmlEvent::Character(text) => SgmlEvent::Character(make_owned(text)),
         }
+    }
+}
+
+fn make_owned<T: ?Sized + ToOwned>(cow: Cow<T>) -> Cow<'static, T> {
+    match cow {
+        Cow::Borrowed(x) => Cow::Owned(x.to_owned()),
+        Cow::Owned(x) => Cow::Owned(x),
     }
 }
 
