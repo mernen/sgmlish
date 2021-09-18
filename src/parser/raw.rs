@@ -25,7 +25,7 @@ where
         recognize(tuple((
             tag("<!"),
             peek(one_of("->")),
-            cut(opt(pair(comment, many0_count(pair(spaces, comment))))),
+            opt(preceded(comment, many0_count(preceded(spaces, comment)))),
             context(r##"comment declaration close ("-->")"##, cut(char('>'))),
         ))),
     )(input)
@@ -175,7 +175,7 @@ where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     verify(
-        recognize(tuple((
+        recognize(pair(
             opt(|input| plain_text(input, mse)),
             many0_count(tuple((
                 tag("<"),
@@ -189,7 +189,7 @@ where
                 ))),
                 opt(|input| plain_text(input, mse)),
             ))),
-        ))),
+        )),
         |s: &str| !s.is_empty(),
     )(input)
 }
