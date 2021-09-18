@@ -1,6 +1,7 @@
 //! Deserialize SGML data to a Rust data structure.
 
 use std::borrow::Cow;
+use std::rc::Rc;
 use std::{fmt, mem};
 
 use log::{debug, trace};
@@ -78,7 +79,7 @@ where
 pub struct SgmlDeserializer<'de> {
     events: std::vec::IntoIter<SgmlEvent<'de>>,
     stack: Vec<Cow<'de, str>>,
-    map_key: Option<String>,
+    map_key: Option<Rc<str>>,
     accumulated_text: Option<Cow<'de, str>>,
 }
 
@@ -518,7 +519,7 @@ impl<'de, 'r> Deserializer<'de> for &'r mut SgmlDeserializer<'de> {
         trace!("deserialize_seq (tag: {:?})", self.map_key);
         let stack_size = self.stack.len();
 
-        let tag_name = self.map_key.take();
+        let tag_name = self.map_key.take().map(Into::into);
         let value = visitor.visit_seq(SeqAccess::new(self, tag_name))?;
 
         self.check_stack_size(stack_size);
@@ -667,7 +668,7 @@ impl de::Error for DeserializationError {
 struct MapAccess<'de, 'r> {
     de: &'r mut SgmlDeserializer<'de>,
     stack_size: usize,
-    map_key: Option<String>,
+    map_key: Option<Rc<str>>,
     content_strategy: ContentStrategy,
     text_content: Option<CowBuffer<'de>>,
     next_entry_is_dollarvalue: bool,
@@ -743,7 +744,7 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
                 SgmlEvent::OpenStartTag(tag_name) => match self.content_strategy {
                     ContentStrategy::ElementsAreMapEntries => {
                         debug!("next key: {} (from tag name)", tag_name);
-                        self.map_key = Some(tag_name.to_string());
+                        self.map_key = Some(tag_name.clone().into_owned().into());
                         seed.deserialize(tag_name.as_ref().into_deserializer())
                             .map(Some)
                     }
@@ -794,11 +795,11 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
 struct SeqAccess<'de, 'r> {
     de: &'r mut SgmlDeserializer<'de>,
     stack_size: usize,
-    tag_name: Option<String>,
+    tag_name: Option<Rc<str>>,
 }
 
 impl<'de, 'r> SeqAccess<'de, 'r> {
-    fn new(de: &'r mut SgmlDeserializer<'de>, tag_name: Option<String>) -> Self {
+    fn new(de: &'r mut SgmlDeserializer<'de>, tag_name: Option<Rc<str>>) -> Self {
         let stack_size = de.stack.len();
         Self {
             de,
@@ -820,7 +821,9 @@ impl<'de, 'r> de::SeqAccess<'de> for SeqAccess<'de, 'r> {
         loop {
             match self.de.peek()? {
                 SgmlEvent::OpenStartTag(tag_name) => match &self.tag_name {
-                    Some(expected_tag) if tag_name != expected_tag => return Ok(None),
+                    Some(expected_tag) if tag_name.as_ref() != expected_tag.as_ref() => {
+                        return Ok(None)
+                    }
                     _ => {
                         if self.de.map_key != self.tag_name {
                             self.de.map_key = self.tag_name.clone();
@@ -896,7 +899,7 @@ impl<'de, 'r> de::VariantAccess<'de> for EnumAccess<'de, 'r> {
     {
         trace!("tuple_variant({} items)", len);
         if self.use_tag_name_for_variant {
-            self.de.map_key = Some(self.de.expect_start_tag()?.to_string());
+            self.de.map_key = Some(self.de.expect_start_tag()?.clone().into_owned().into());
         }
         self.de.deserialize_seq(visitor)
     }
