@@ -143,6 +143,15 @@ mod tests {
     }
 
     #[test]
+    fn test_is_blank() {
+        assert!(is_blank(""));
+        assert!(is_blank(" "));
+        assert!(is_blank(" \t\r\n  "));
+        assert!(!is_blank("  a\n"));
+        assert!(!is_blank("  \u{0c}\n"));
+    }
+
+    #[test]
     fn test_escape_noop() {
         assert_eq!(escape("hello!").to_string(), "hello!");
     }

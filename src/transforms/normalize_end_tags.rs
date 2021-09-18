@@ -8,10 +8,8 @@ use crate::{text, SgmlEvent, SgmlFragment};
 pub enum NormalizationError {
     #[error("unpaired end tag: </{0}>")]
     UnpairedEndTag(String),
-    #[error("empty start tags (<>) are not supported")]
-    EmptyStartTagNotSupported,
-    #[error("empty end tags (</>) are not supported")]
-    EmptyEndTagNotSupported,
+    #[error("empty tags (<> and </>) are not supported")]
+    EmptyTagNotSupported,
 }
 
 /// Inserts omitted end tags, assuming they are only implied for text-only content.
@@ -76,10 +74,10 @@ pub fn normalize_end_tags(mut fragment: SgmlFragment) -> Result<SgmlFragment, No
 
     for (i, event) in fragment.iter_mut().enumerate().rev() {
         match event {
+            SgmlEvent::OpenStartTag(name) | SgmlEvent::EndTag(name) if name.is_empty() => {
+                return Err(NormalizationError::EmptyTagNotSupported);
+            }
             SgmlEvent::OpenStartTag(name) => {
-                if name.is_empty() {
-                    return Err(NormalizationError::EmptyStartTagNotSupported);
-                }
                 let insertion_point = end_xml_empty_element.take().or_else(|| match stack.last() {
                     Some(end_name) if *end_name == name => {
                         stack.pop();
@@ -97,14 +95,13 @@ pub fn normalize_end_tags(mut fragment: SgmlFragment) -> Result<SgmlFragment, No
                 end_xml_empty_element = Some(i + 1);
             }
             SgmlEvent::EndTag(name) => {
-                if name.is_empty() {
-                    return Err(NormalizationError::EmptyEndTagNotSupported);
-                }
                 stack.push(name);
                 next_insertion_point = i;
             }
-            SgmlEvent::Character(text) if next_insertion_point == i + 1 && text::is_blank(text) => {
-                next_insertion_point = i;
+            SgmlEvent::Character(text) => {
+                if next_insertion_point == i + 1 && text::is_blank(text) {
+                    next_insertion_point = i;
+                }
             }
             _ => {}
         }
@@ -126,14 +123,14 @@ mod tests {
     #[test]
     fn test_normalize_end_tags_noop() {
         let fragment = parse(
-            "\
-                <root>\
-                    <foo>hello</foo>\
-                    <bar>\
-                        world<!-- -->!\
-                    </bar>\
-                </root>\
-            ",
+            r##"
+                <root>
+                    <foo>hello</foo>
+                    <bar>
+                        world<!-- -->!
+                    </bar>
+                </root>
+            "##,
         )
         .unwrap();
 
@@ -144,12 +141,12 @@ mod tests {
     #[test]
     fn test_normalize_end_tags_simple() {
         let fragment = parse(
-            "\
-                <root>\
-                    <foo>hello\
-                    <bar>world!\
-                </root>\
-            ",
+            r##"
+                <root>
+                    <foo>hello
+                    <bar>world!
+                </root>
+            "##,
         )
         .unwrap();
 
@@ -157,12 +154,12 @@ mod tests {
         assert_eq!(
             result,
             parse(
-                "\
-                    <root>\
-                        <foo>hello</foo>\
-                        <bar>world!</bar>\
-                    </root>\
-                ",
+                r##"
+                    <root>
+                        <foo>hello</foo>
+                        <bar>world!</bar>
+                    </root>
+                "##,
             )
             .unwrap(),
         );
@@ -170,47 +167,48 @@ mod tests {
 
     #[test]
     fn test_normalize_end_tags_insert_before_whitespace() {
-        let fragment = parse(
-            "\
-                <root>
-                    <foo>
-                    <bar>hello
-                    <baz>
-                    <quux>world!<!-- -->
-                    <xyzzy>
-                </root>\
-            ",
-        )
-        .unwrap();
-
-        let result = normalize_end_tags(fragment).unwrap();
-        assert_eq!(
-            result,
-            parse(
-                "\
-                <root>
-                    <foo></foo>
-                    <bar>hello
-                    </bar><baz></baz>
-                    <quux>world!</quux>
-                    <xyzzy></xyzzy>
-                </root>\
-                ",
+        let parser = crate::Parser::builder().trim_whitespace(false).build();
+        let fragment = parser
+            .parse(
+                r##"
+                    <root>
+                        <foo>
+                        <bar>hello
+                        <baz>
+                        <quux>world!<!-- -->
+                        <xyzzy>
+                    </root>
+                "##,
             )
-            .unwrap(),
-        );
+            .unwrap();
+
+        let expected = parser
+            .parse(
+                r##"
+                    <root>
+                        <foo></foo>
+                        <bar>hello
+                        </bar><baz></baz>
+                        <quux>world!</quux>
+                        <xyzzy></xyzzy>
+                    </root>
+                "##,
+            )
+            .unwrap();
+        let result = normalize_end_tags(fragment).unwrap();
+        assert_eq!(result, expected,);
     }
 
     #[test]
     fn test_normalize_end_tags_xml_empty() {
         let fragment = parse(
-            "\
-                <foo>\
-                    <bar/>\
-                    <baz>Hello\
-                    <foo x='1'/>\
-                </foo>\
-            ",
+            r##"
+                <foo>
+                    <bar/>
+                    <baz>Hello
+                    <foo x='1'/>
+                </foo>
+            "##,
         )
         .unwrap();
 
@@ -218,13 +216,13 @@ mod tests {
         assert_eq!(
             result,
             parse(
-                "\
-                    <foo>\
-                        <bar></bar>\
-                        <baz>Hello</baz>\
-                        <foo x='1'></foo>\
-                    </foo>\
-                "
+                r##"
+                    <foo>
+                        <bar></bar>
+                        <baz>Hello</baz>
+                        <foo x='1'></foo>
+                    </foo>
+                "##
             )
             .unwrap()
         );
@@ -233,13 +231,13 @@ mod tests {
     #[test]
     fn test_normalize_end_tags_unpaired_end() {
         let fragment = parse(
-            "\
-            <foo>\
-                <bar>a</bar>\
-                <baz>\
-                </bar>\
-            </foo>
-        ",
+            r##"
+                <foo>
+                    <bar>a</bar>
+                    <baz>
+                    </bar>
+                </foo>
+            "##,
         )
         .unwrap();
 
