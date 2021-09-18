@@ -84,7 +84,7 @@ impl<'a> Transform<'a> {
     /// let mut transform = Transform::new();
     /// // Insert another attribute
     /// transform.insert_at(2, SgmlEvent::Attribute("TARGET".into(), Some("_blank".into())));
-    /// // Close the tag
+    /// // Insert end tag
     /// transform.insert_at(4, SgmlEvent::EndTag("A".into()));
     /// let result = transform.apply(fragment);
     ///
