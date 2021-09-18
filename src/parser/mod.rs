@@ -215,7 +215,7 @@ where
     E: nom::error::ContextError<&'a str> + nom::error::FromExternalError<&'a str, crate::Error>,
 {
     use nom::Slice;
-    let slice = input.slice(err.position..);
+    let slice = input.slice(err.position.clone());
     nom::Err::Error(E::add_context(
         slice,
         if slice.starts_with("&#") {
@@ -419,7 +419,7 @@ mod tests {
     fn test_config_parse_rcdata() {
         let config = ParserConfig::default();
         match config.parse_rcdata::<nom::error::Error<_>>("hello &x; world") {
-            Err(nom::Err::Error(err)) => assert_eq!(err.input, "&x; world"),
+            Err(nom::Err::Error(err)) => assert_eq!(err.input, "&x;"),
             err => panic!("expected nom::Err::Error, got: {:?}", err),
         };
     }

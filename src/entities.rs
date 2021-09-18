@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 use std::char;
+use std::ops::Range;
 
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_while1};
@@ -24,8 +25,8 @@ pub type Result<T = ()> = std::result::Result<T, EntityError>;
 pub struct EntityError {
     /// The name of the entity that was not found.
     pub entity: String,
-    /// The byte offset of the entity in the source string.
-    pub position: usize,
+    /// The slice range of the entity in the source string.
+    pub position: Range<usize>,
 }
 
 /// Expands character references (`&#123;`) in the given text.
@@ -122,7 +123,7 @@ where
                     f(name)
                         .ok_or_else(|| EntityError {
                             entity: name.to_owned(),
-                            position: text.len() - candidate.len(),
+                            position: text.len() - candidate.len()..text.len() - after.len(),
                         })?
                         .as_ref(),
                 );
@@ -211,7 +212,7 @@ mod tests {
             result,
             Err(EntityError {
                 entity: "#x110000".to_owned(),
-                position: 3,
+                position: 3..13,
             })
         );
     }
@@ -277,7 +278,7 @@ mod tests {
             result,
             Err(EntityError {
                 entity: "bar".into(),
-                position: 10,
+                position: 10..15,
             })
         );
     }
@@ -295,7 +296,7 @@ mod tests {
             result,
             Err(EntityError {
                 entity: "#test".into(),
-                position: 3,
+                position: 3..10,
             })
         );
     }
