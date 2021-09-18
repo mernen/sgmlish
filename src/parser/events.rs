@@ -301,7 +301,15 @@ where
     E: ParseError<&'a str> + ContextError<&'a str> + FromExternalError<&'a str, Error>,
 {
     map(
-        |input| raw::attribute_parse_value(input, |value| config.parse_rcdata(value)),
+        |input| {
+            raw::attribute_parse_value(input, |value, quoted| {
+                if quoted {
+                    config.parse_rcdata(value)
+                } else {
+                    Ok(value.into())
+                }
+            })
+        },
         |(key, value)| SgmlEvent::Attribute(config.name_normalization.normalize(key.into()), value),
     )(input)
 }
@@ -707,7 +715,7 @@ mod tests {
     #[test]
     fn test_start_tag_xml_no_content() {
         let config = Default::default();
-        let (rest, mut events) = start_tag::<E>("<br />", &config).unwrap();
+        let (rest, mut events) = start_tag::<E>("<br/>", &config).unwrap();
         assert_eq!(rest, "");
 
         assert_eq!(events.next(), Some(OpenStartTag("br".into())));
@@ -724,6 +732,15 @@ mod tests {
         assert_eq!(events.next(), Some(OpenStartTag("".into())));
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
+    }
+
+    #[test]
+    fn test_attribute_unquoted_is_literal() {
+        let config = Default::default();
+        assert_eq!(
+            attribute::<E>("value=test&#33; ", &config),
+            Ok((" ", Attribute("value".into(), Some("test&#33;".into()))))
+        );
     }
 
     #[test]

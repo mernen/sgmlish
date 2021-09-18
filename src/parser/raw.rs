@@ -5,7 +5,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_till, take_while};
 use nom::character::complete::{char, none_of, one_of, satisfy};
-use nom::combinator::{cut, map, map_parser, not, opt, peek, recognize, verify};
+use nom::combinator::{cut, map, not, opt, peek, recognize, verify};
 use nom::error::{context, ContextError, ErrorKind, ParseError};
 use nom::multi::many0_count;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
@@ -267,7 +267,7 @@ pub fn attribute<'a, E>(input: &'a str) -> IResult<&'a str, (&'a str, Option<&'a
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    attribute_parse_value(input, Ok)
+    attribute_parse_value(input, |value, _quoted| Ok(value))
 }
 
 /// Matches an attribute key-value pair, parses the value (if present) with
@@ -277,7 +277,7 @@ pub fn attribute_parse_value<'a, F, T, E>(
     mut f: F,
 ) -> IResult<&'a str, (&'a str, Option<T>), E>
 where
-    F: FnMut(&'a str) -> Result<T, nom::Err<E>>,
+    F: FnMut(&'a str, bool) -> Result<T, nom::Err<E>>,
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     context(
@@ -288,9 +288,10 @@ where
                 strip_spaces_around(char('=')),
                 context(
                     "attribute value",
-                    cut(map_parser(attribute_value, move |input| {
-                        f(input).map(|value| ("", value))
-                    })),
+                    cut(|input| {
+                        let (rest, (value, quoted)) = attribute_value(input)?;
+                        Ok((rest, f(value, quoted)?))
+                    }),
                 ),
             )),
         ),
@@ -299,11 +300,17 @@ where
 
 /// Matches either a [quoted](quoted_attribute_value) or
 /// [unquoted attribute value](unquoted_attribute_value).
-pub fn attribute_value<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
+///
+/// Outputs the value (without quotes) and a boolean indicating whether
+/// quotes were present or note.
+pub fn attribute_value<'a, E>(input: &'a str) -> IResult<&'a str, (&'a str, bool), E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
-    alt((unquoted_attribute_value, quoted_attribute_value))(input)
+    alt((
+        map(unquoted_attribute_value, |value| (value, false)),
+        map(quoted_attribute_value, |value| (value, true)),
+    ))(input)
 }
 
 /// Matches an unquoted attribute value and outputs it.
