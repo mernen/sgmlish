@@ -124,15 +124,13 @@ impl Default for NameNormalization {
 }
 
 impl NameNormalization {
-    pub fn normalize<'a>(&self, mut name: Cow<'a, str>) -> Cow<'a, str> {
+    pub fn normalize<'a>(&self, name: Cow<'a, str>) -> Cow<'a, str> {
         match self {
-            NameNormalization::ToLowercase if name.chars().any(|c| c.is_ascii_uppercase()) => {
-                name.to_mut().make_ascii_lowercase();
-                name
+            NameNormalization::ToLowercase if name.chars().any(char::is_uppercase) => {
+                name.to_lowercase().into()
             }
-            NameNormalization::ToUppercase if name.chars().any(|c| c.is_ascii_lowercase()) => {
-                name.to_mut().make_ascii_uppercase();
-                name
+            NameNormalization::ToUppercase if name.chars().any(char::is_lowercase) => {
+                name.to_uppercase().into()
             }
             _ => name,
         }
@@ -368,5 +366,90 @@ struct Ellipsis;
 impl fmt::Debug for Ellipsis {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str("...")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_name_normalization_unchanged() {
+        assert!(matches!(
+            NameNormalization::Unchanged.normalize("hello".into()),
+            Cow::Borrowed("hello")
+        ));
+        assert!(matches!(
+            NameNormalization::Unchanged.normalize("Hello".into()),
+            Cow::Borrowed("Hello")
+        ));
+        assert!(matches!(
+            NameNormalization::Unchanged.normalize("HELLO".into()),
+            Cow::Borrowed("HELLO")
+        ));
+        assert!(matches!(
+            NameNormalization::Unchanged.normalize("題名".into()),
+            Cow::Borrowed("題名")
+        ));
+        assert!(matches!(
+            NameNormalization::Unchanged.normalize("grüße".into()),
+            Cow::Borrowed("grüße")
+        ));
+    }
+
+    #[test]
+    fn test_name_normalization_to_lowercase() {
+        assert!(matches!(
+            NameNormalization::ToLowercase.normalize("hello".into()),
+            Cow::Borrowed("hello")
+        ));
+        assert_eq!(
+            NameNormalization::ToLowercase.normalize("Hello".into()),
+            "hello"
+        );
+        assert_eq!(
+            NameNormalization::ToLowercase.normalize("HELLO".into()),
+            "hello"
+        );
+        assert!(matches!(
+            NameNormalization::ToLowercase.normalize("題名".into()),
+            Cow::Borrowed("題名")
+        ));
+        assert!(matches!(
+            NameNormalization::ToLowercase.normalize("grüße".into()),
+            Cow::Borrowed("grüße")
+        ));
+        assert_eq!(
+            NameNormalization::ToLowercase.normalize("Grüße".into()),
+            "grüße"
+        );
+    }
+
+    #[test]
+    fn test_name_normalization_to_uppercase() {
+        assert!(matches!(
+            NameNormalization::ToUppercase.normalize("HELLO".into()),
+            Cow::Borrowed("HELLO")
+        ));
+        assert_eq!(
+            NameNormalization::ToUppercase.normalize("Hello".into()),
+            "HELLO"
+        );
+        assert_eq!(
+            NameNormalization::ToUppercase.normalize("hello".into()),
+            "HELLO"
+        );
+        assert!(matches!(
+            NameNormalization::ToUppercase.normalize("題名".into()),
+            Cow::Borrowed("題名")
+        ));
+        assert!(matches!(
+            NameNormalization::ToUppercase.normalize("GRÜSSE".into()),
+            Cow::Borrowed("GRÜSSE")
+        ));
+        assert_eq!(
+            NameNormalization::ToUppercase.normalize("grüße".into()),
+            "GRÜSSE"
+        );
     }
 }

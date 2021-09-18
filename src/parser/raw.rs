@@ -345,7 +345,14 @@ where
     )(input)
 }
 
-/// Matches a name according to HTML4's definition.
+/// Matches a name.
+///
+/// In the spirit of HTML4's definition, names must start with an alphabetic
+/// character, and may be followed by any number of alphanumeric characters,
+/// or any of the following symbols: `.-_:`
+///
+/// Unlike HTML4, however, the full range of Unicode alphabetic and numeric
+/// characters is accepted.
 pub fn name<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
@@ -353,7 +360,10 @@ where
     recognize(terminated(name_start, take_while(is_name_char)))(input)
 }
 
-/// Matches the first character of a name according to HTML4's definition.
+/// Matches the first character of a name.
+///
+/// Following the spirit of HTML4's definition, only alphabetic characters are
+/// accepted; however, any Unicode alphabetic character is accepted.
 pub fn name_start<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
