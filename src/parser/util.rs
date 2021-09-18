@@ -9,8 +9,6 @@ use nom::multi::many0_count;
 use nom::sequence::{delimited, terminated};
 use nom::{IResult, Parser};
 
-use crate::text::is_sgml_whitespace;
-
 use super::raw;
 
 /// Outputs all characters until the given delimiter is found,
@@ -22,34 +20,18 @@ pub fn take_until_terminated<'a, E: ParseError<&'a str> + ContextError<&'a str>>
     delimiter: &'static str,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str, E> {
     let fail = move |input: &'a str| {
-        // Pointing at the very last character isn't very useful when there's a terminating newline.
-        // So we try to skip any completely blank lines, and instead point at the last character in
-        // the last non-blank line (even if that character is whitespace)
-        let last_non_whitespace_pos = input
-            .rfind(|c: char| !is_sgml_whitespace(c))
-            .unwrap_or(input.len());
-        let last_relevant_pos = input[last_non_whitespace_pos..]
-            .find(|c: char| c == '\r' || c == '\n')
-            .map(|i| last_non_whitespace_pos + i)
-            .unwrap_or(input.len());
         // On multi-character delimiters, like "]]>", if a partial match occurs
         // (for example the input ends in "]]"), try to identify the largest partial match
-        let matching_delimiter_prefix_len = (1..delimiter.len())
+        let partial_delimiter_len = (1..delimiter.len())
             .rev()
-            .find(|delimiter_prefix_len| {
-                let delimiter_prefix = &delimiter[..*delimiter_prefix_len];
-                input[..last_relevant_pos].ends_with(delimiter_prefix)
-            })
+            .find(|&prefix_len| input.ends_with(&delimiter[..prefix_len]))
             .unwrap_or(0);
         Err(nom::Err::Failure(E::add_context(
-            &input[last_relevant_pos - matching_delimiter_prefix_len..],
+            &input[input.len() - partial_delimiter_len..],
             ctx,
             E::from_char(
-                &input[last_relevant_pos..],
-                delimiter
-                    .chars()
-                    .nth(matching_delimiter_prefix_len)
-                    .unwrap(),
+                &input[input.len()..],
+                delimiter.chars().nth(partial_delimiter_len).unwrap(),
             ),
         )))
     };
