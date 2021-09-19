@@ -8,13 +8,14 @@ sgmlish
 sgmlish is a library for parsing, manipulating and deserializing SGML.
 
 It's not intended to be a full-featured implementation of the SGML spec;
-rather, it's meant to successfully parse SGML documents for most common
-applications, like [OFX] 1.x, and then delegate to [Serde].
-
-In particular, DTDs are not supported. That means case normalization and entities
+in particular, DTDs are not supported. That means case normalization and entities
 must be configured before parsing, and any desired validation or normalization,
 like inserting omitted tags, must be either performed through a built-in transform
 or implemented manually.
+
+Still, its support is complete enough to successfully parse SGML documents for
+common applications, like [OFX] 1.x, and with little extra work it's ready to
+delegate to [Serde].
 
 
 ## Non-goals
@@ -34,7 +35,8 @@ or implemented manually.
   [serde-xml-rs] offers a very similar deserialization experience to this library.
 
 * The following SGML features are hard to properly implement without full doctype
-  awareness during parsing, and are therefore beyond the scope of this library:
+  awareness during parsing, and are therefore currently considered beyond the
+  scope of this library:
   * NET (Null End Tag) forms: `<FOO/example/`
   * Custom definitions of character sets, like `SEPCHAR` or `LCNMSTRT`
 
@@ -83,7 +85,7 @@ let sgml = sgmlish::transforms::normalize_end_tags(sgml)?;
 let example = sgmlish::from_fragment::<Example>(sgml)?;
 ```
 
-1.  Parsing: configure an [`sgmlish::Parser`] as desired --- for example, by
+1.  Parsing: configure a [`sgmlish::Parser`] as desired — for example, by
     normalizing tag names or defining how entities (`&example;`) should be resolved.
     Once it's configured, feed it the SGML string.
 
