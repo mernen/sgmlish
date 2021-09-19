@@ -1,4 +1,4 @@
-use std::fmt::{self, Write};
+use std::fmt;
 
 use crate::SgmlEvent;
 
@@ -100,12 +100,11 @@ impl<'a, 'b> IntoIterator for &'b mut SgmlFragment<'a> {
 
 impl fmt::Display for SgmlFragment<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.events.iter().try_for_each(|event| match event {
-            SgmlEvent::Attribute(..) => {
-                f.write_char(' ')?;
-                fmt::Display::fmt(event, f)
+        self.events.iter().try_for_each(|event| {
+            if let SgmlEvent::Attribute { .. } = event {
+                f.write_str(" ")?;
             }
-            event => fmt::Display::fmt(event, f),
+            fmt::Display::fmt(event, f)
         })
     }
 }

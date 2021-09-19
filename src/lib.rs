@@ -55,7 +55,10 @@ pub enum SgmlEvent<'a> {
     /// with an empty slice.
     OpenStartTag { name: Cow<'a, str> },
     /// An attribute inside a start-element tag, e.g. `FOO="bar"`.
-    Attribute(Cow<'a, str>, Option<Cow<'a, str>>),
+    Attribute {
+        name: Cow<'a, str>,
+        value: Option<Cow<'a, str>>,
+    },
     /// Closing of a start-element tag, e.g. `>`.
     CloseStartTag,
     /// XML-specific closing of empty elements, e.g. `/>`
@@ -87,9 +90,10 @@ impl<'a> SgmlEvent<'a> {
             SgmlEvent::OpenStartTag { name } => SgmlEvent::OpenStartTag {
                 name: make_owned(name),
             },
-            SgmlEvent::Attribute(key, value) => {
-                SgmlEvent::Attribute(make_owned(key), value.map(make_owned))
-            }
+            SgmlEvent::Attribute { name, value } => SgmlEvent::Attribute {
+                name: make_owned(name),
+                value: value.map(make_owned),
+            },
             SgmlEvent::CloseStartTag => SgmlEvent::CloseStartTag,
             SgmlEvent::XmlCloseEmptyElement => SgmlEvent::XmlCloseEmptyElement,
             SgmlEvent::EndTag { name } => SgmlEvent::EndTag {
@@ -125,8 +129,11 @@ impl fmt::Display for SgmlEvent<'_> {
                 write!(f, "<![{}[{}]]>", status_keywords, section)
             }
             SgmlEvent::OpenStartTag { name } => write!(f, "<{}", name),
-            SgmlEvent::Attribute(name, None) => f.write_str(name),
-            SgmlEvent::Attribute(name, Some(value)) => {
+            SgmlEvent::Attribute { name, value: None } => f.write_str(name),
+            SgmlEvent::Attribute {
+                name,
+                value: Some(value),
+            } => {
                 f.write_str(name)?;
                 let escape_ampersand = value.contains('&');
                 if !escape_ampersand && !value.contains('"') {
@@ -185,10 +192,25 @@ mod tests {
 
         assert_eq!(format!("{}", OpenStartTag { name: "foo".into() }), "<foo");
         assert_eq!(
-            format!("{}", Attribute("foo".into(), Some("bar".into()))),
+            format!(
+                "{}",
+                Attribute {
+                    name: "foo".into(),
+                    value: Some("bar".into()),
+                }
+            ),
             "foo=\"bar\""
         );
-        assert_eq!(format!("{}", Attribute("foo".into(), None)), "foo");
+        assert_eq!(
+            format!(
+                "{}",
+                Attribute {
+                    name: "foo".into(),
+                    value: None,
+                }
+            ),
+            "foo"
+        );
         assert_eq!(format!("{}", CloseStartTag), ">");
         assert_eq!(format!("{}", XmlCloseEmptyElement), "/>");
         assert_eq!(format!("{}", EndTag { name: "foo".into() }), "</foo>");
@@ -199,33 +221,68 @@ mod tests {
 
     #[test]
     fn test_display_attribute() {
-        assert_eq!(SgmlEvent::Attribute("key".into(), None).to_string(), "key");
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some("value".into())).to_string(),
+            SgmlEvent::Attribute {
+                name: "key".into(),
+                value: None
+            }
+            .to_string(),
+            "key"
+        );
+        assert_eq!(
+            SgmlEvent::Attribute {
+                name: "key".into(),
+                value: Some("value".into()),
+            }
+            .to_string(),
             "key=\"value\""
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some("va'lue".into())).to_string(),
+            SgmlEvent::Attribute {
+                name: "key".into(),
+                value: Some("va'lue".into()),
+            }
+            .to_string(),
             "key=\"va'lue\""
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some("va\"lue".into())).to_string(),
+            SgmlEvent::Attribute {
+                name: "key".into(),
+                value: Some("va\"lue".into()),
+            }
+            .to_string(),
             "key='va\"lue'"
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some("va\"lu'e".into())).to_string(),
+            SgmlEvent::Attribute {
+                name: "key".into(),
+                value: Some("va\"lu'e".into()),
+            }
+            .to_string(),
             "key=\"va&#34;lu'e\""
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some("a&o".into())).to_string(),
+            SgmlEvent::Attribute {
+                name: "key".into(),
+                value: Some("a&o".into()),
+            }
+            .to_string(),
             "key=\"a&#38;o\""
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some("a&o\"".into())).to_string(),
+            SgmlEvent::Attribute {
+                name: "key".into(),
+                value: Some("a&o\"".into()),
+            }
+            .to_string(),
             "key=\"a&#38;o&#34;\""
         );
         assert_eq!(
-            SgmlEvent::Attribute("key".into(), Some("a&o'".into())).to_string(),
+            SgmlEvent::Attribute {
+                name: "key".into(),
+                value: Some("a&o'".into()),
+            }
+            .to_string(),
             "key=\"a&#38;o'\""
         );
     }

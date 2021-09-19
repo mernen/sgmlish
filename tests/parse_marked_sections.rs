@@ -67,7 +67,10 @@ fn test_include_trim_whitespace() {
     );
     assert_eq!(
         events.next(),
-        Some(SgmlEvent::Attribute("PROP".into(), Some(" ]]> ".into())))
+        Some(SgmlEvent::Attribute {
+            name: "PROP".into(),
+            value: Some(" ]]> ".into()),
+        })
     );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(
@@ -148,7 +151,10 @@ fn test_include_keep_whitespace() {
     );
     assert_eq!(
         events.next(),
-        Some(SgmlEvent::Attribute("PROP".into(), Some(" ]]> ".into())))
+        Some(SgmlEvent::Attribute {
+            name: "PROP".into(),
+            value: Some(" ]]> ".into()),
+        })
     );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(events.next(), Some(SgmlEvent::Character(" ".into())));
@@ -282,7 +288,10 @@ fn test_cdata_trim_whitespace() {
     );
     assert_eq!(
         events.next(),
-        Some(SgmlEvent::Attribute("PROP".into(), Some(" ]]> ".into())))
+        Some(SgmlEvent::Attribute {
+            name: "PROP".into(),
+            value: Some(" ]]> ".into()),
+        })
     );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(

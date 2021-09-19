@@ -261,7 +261,7 @@ impl<'de> SgmlDeserializer<'de> {
     ///
     /// Should only be used immediately after `push_elt`.
     fn advance_to_content(&mut self) -> Result<(), DeserializationError> {
-        while let SgmlEvent::Attribute(..) | SgmlEvent::CloseStartTag = self.peek()? {
+        while let SgmlEvent::Attribute { .. } | SgmlEvent::CloseStartTag = self.peek()? {
             self.advance()?;
         }
         Ok(())
@@ -279,9 +279,9 @@ impl<'de> SgmlDeserializer<'de> {
         }
 
         debug!("consume_text");
-        if let SgmlEvent::Attribute(key, value) = self.peek_mut()? {
+        if let SgmlEvent::Attribute { name, value } = self.peek_mut()? {
             let value = mem::take(value);
-            debug!("consumed text from attribute({}): {:?}", key, value);
+            debug!("consumed text from attribute({}): {:?}", name, value);
             self.advance()?;
             return Ok(value.unwrap_or_default());
         }
@@ -384,10 +384,10 @@ impl<'de, 'r> Deserializer<'de> for &'r mut SgmlDeserializer<'de> {
     {
         trace!("deserialize_bool");
 
-        if let SgmlEvent::Attribute(key, value) = self.peek()? {
+        if let SgmlEvent::Attribute { name, value } = self.peek()? {
             // Treat empty values and repetitions of the key as true values
             let value = value.as_deref().unwrap_or_default();
-            if value.is_empty() || value.eq_ignore_ascii_case(key) {
+            if value.is_empty() || value.eq_ignore_ascii_case(name) {
                 self.advance()?;
                 return visitor.visit_bool(true);
             }
@@ -480,7 +480,7 @@ impl<'de, 'r> Deserializer<'de> for &'r mut SgmlDeserializer<'de> {
                 self.pop_elt()?;
                 visitor.visit_unit()
             }
-            SgmlEvent::Attribute(..) => {
+            SgmlEvent::Attribute { .. } => {
                 self.advance()?;
                 visitor.visit_unit()
             }
@@ -645,7 +645,7 @@ impl<'de, 'r> Deserializer<'de> for &'r mut SgmlDeserializer<'de> {
                     self.deserialize_unit(visitor)
                 }
             }
-            SgmlEvent::Attribute(..) => self.deserialize_str(visitor),
+            SgmlEvent::Attribute { .. } => self.deserialize_str(visitor),
             _ => Err(DeserializationError::ExpectedStartTag),
         }
     }
@@ -733,9 +733,10 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
                         Ok(None)
                     }
                 }
-                SgmlEvent::Attribute(key, _value) => {
-                    debug!("next key: {} (from attribute)", key);
-                    seed.deserialize(key.as_ref().into_deserializer()).map(Some)
+                SgmlEvent::Attribute { name, .. } => {
+                    debug!("next key: {} (from attribute)", name);
+                    seed.deserialize(name.as_ref().into_deserializer())
+                        .map(Some)
                 }
                 SgmlEvent::CloseStartTag => {
                     self.de.advance()?;
@@ -781,7 +782,7 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
             let value = seed.deserialize(&mut *self.de)?;
             self.de.accumulated_text = None;
             Ok(value)
-        } else if let Ok(SgmlEvent::Attribute(..)) = self.de.peek() {
+        } else if let Ok(SgmlEvent::Attribute { .. }) = self.de.peek() {
             seed.deserialize(&mut *self.de)
         } else {
             self.de.map_key = self.map_key.take();

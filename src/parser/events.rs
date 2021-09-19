@@ -310,7 +310,10 @@ where
                 }
             })
         },
-        |(key, value)| SgmlEvent::Attribute(config.name_normalization.normalize(key.into()), value),
+        |(name, value)| SgmlEvent::Attribute {
+            name: config.name_normalization.normalize(name.into()),
+            value,
+        },
     )(input)
 }
 
@@ -720,11 +723,17 @@ mod tests {
         assert_eq!(events.next(), Some(OpenStartTag { name: "a".into() }));
         assert_eq!(
             events.next(),
-            Some(Attribute("href".into(), Some("test.htm".into())))
+            Some(Attribute {
+                name: "href".into(),
+                value: Some("test.htm".into()),
+            })
         );
         assert_eq!(
             events.next(),
-            Some(Attribute("target".into(), Some("_blank".into())))
+            Some(Attribute {
+                name: "target".into(),
+                value: Some("_blank".into()),
+            })
         );
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
@@ -740,11 +749,17 @@ mod tests {
         assert_eq!(events.next(), Some(OpenStartTag { name: "a".into() }));
         assert_eq!(
             events.next(),
-            Some(Attribute("href".into(), Some("test.htm".into())))
+            Some(Attribute {
+                name: "href".into(),
+                value: Some("test.htm".into()),
+            })
         );
         assert_eq!(
             events.next(),
-            Some(Attribute("target".into(), Some("_blank".into())))
+            Some(Attribute {
+                name: "target".into(),
+                value: Some("_blank".into()),
+            })
         );
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
@@ -760,11 +775,17 @@ mod tests {
         assert_eq!(events.next(), Some(OpenStartTag { name: "A".into() }));
         assert_eq!(
             events.next(),
-            Some(Attribute("HREF".into(), Some("test.htm".into())))
+            Some(Attribute {
+                name: "HREF".into(),
+                value: Some("test.htm".into()),
+            })
         );
         assert_eq!(
             events.next(),
-            Some(Attribute("TARGET".into(), Some("_blank".into())))
+            Some(Attribute {
+                name: "TARGET".into(),
+                value: Some("_blank".into()),
+            })
         );
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
@@ -780,11 +801,17 @@ mod tests {
         assert_eq!(events.next(), Some(OpenStartTag { name: "img".into() }));
         assert_eq!(
             events.next(),
-            Some(Attribute("alt".into(), Some(" test ".into())))
+            Some(Attribute {
+                name: "alt".into(),
+                value: Some(" test ".into()),
+            })
         );
         assert_eq!(
             events.next(),
-            Some(Attribute("longdesc".into(), Some(" desc".into())))
+            Some(Attribute {
+                name: "longdesc".into(),
+                value: Some(" desc".into()),
+            })
         );
         assert_eq!(events.next(), Some(CloseStartTag));
         assert_eq!(events.next(), None);
@@ -817,7 +844,13 @@ mod tests {
         let config = Default::default();
         assert_eq!(
             attribute::<E>("value=test&#33; ", &config),
-            Ok((" ", Attribute("value".into(), Some("test&#33;".into()))))
+            Ok((
+                " ",
+                Attribute {
+                    name: "value".into(),
+                    value: Some("test&#33;".into()),
+                },
+            )),
         );
     }
 
@@ -881,33 +914,51 @@ mod tests {
         let mut iter = EventIter::start_tag((
             OpenStartTag { name: "foo".into() },
             vec![
-                Attribute("x".into(), Some("y".into())),
-                Attribute("z".into(), None),
+                Attribute {
+                    name: "x".into(),
+                    value: Some("y".into()),
+                },
+                Attribute {
+                    name: "z".into(),
+                    value: None,
+                },
             ],
             CloseStartTag,
         ));
 
         assert_eq!(
             format!("{:?}", iter),
-            r#"EventIter([OpenStartTag { name: "foo" }, Attribute("x", Some("y")), Attribute("z", None), CloseStartTag])"#
+            r##"EventIter([OpenStartTag { name: "foo" }, Attribute { name: "x", value: Some("y") }, Attribute { name: "z", value: None }, CloseStartTag])"##
         );
         assert_eq!(iter.len(), 4);
 
         assert_eq!(iter.next(), Some(OpenStartTag { name: "foo".into() }));
         assert_eq!(
             format!("{:?}", iter),
-            r#"EventIter([Attribute("x", Some("y")), Attribute("z", None), CloseStartTag])"#
+            r##"EventIter([Attribute { name: "x", value: Some("y") }, Attribute { name: "z", value: None }, CloseStartTag])"##
         );
         assert_eq!(iter.len(), 3);
 
-        assert_eq!(iter.next(), Some(Attribute("x".into(), Some("y".into()))));
+        assert_eq!(
+            iter.next(),
+            Some(Attribute {
+                name: "x".into(),
+                value: Some("y".into()),
+            })
+        );
         assert_eq!(
             format!("{:?}", iter),
-            r#"EventIter([Attribute("z", None), CloseStartTag])"#
+            r##"EventIter([Attribute { name: "z", value: None }, CloseStartTag])"##
         );
         assert_eq!(iter.len(), 2);
 
-        assert_eq!(iter.next(), Some(Attribute("z".into(), None)));
+        assert_eq!(
+            iter.next(),
+            Some(Attribute {
+                name: "z".into(),
+                value: None,
+            })
+        );
         assert_eq!(format!("{:?}", iter), "EventIter([CloseStartTag])");
         assert_eq!(iter.len(), 1);
 

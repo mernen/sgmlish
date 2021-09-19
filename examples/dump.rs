@@ -100,7 +100,7 @@ fn reindent(fragment: SgmlFragment) -> SgmlFragment {
                 indent_level -= 1;
                 transform.insert_at(i, indent(indent_level));
             }
-            SgmlEvent::Attribute(..) | SgmlEvent::XmlCloseEmptyElement => {}
+            SgmlEvent::Attribute { .. } | SgmlEvent::XmlCloseEmptyElement => {}
         }
     }
 
