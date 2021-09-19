@@ -39,6 +39,13 @@ where
     Ok(SgmlFragment::from(events))
 }
 
+/// The error type for parse errors.
+///
+/// This error contains a reference to the original input string;
+/// when converted to the more general [`Error`] type, this link is lost,
+/// and only a description of the original error is kept.
+///
+/// [`Error`]: crate::Error
 #[derive(Debug)]
 pub struct ParseError<I, E> {
     input: I,
