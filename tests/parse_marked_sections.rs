@@ -39,11 +39,19 @@ fn test_include_trim_whitespace() {
 
     assert_eq!(events.next(), Some(DOCTYPE));
 
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(events.next(), Some(SgmlEvent::Character("one".into())));
     assert_eq!(events.next(), Some(SgmlEvent::Character("two".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("FOO".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag { name: "FOO".into() })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(events.next(), Some(SgmlEvent::Character("three".into())));
 
@@ -53,13 +61,19 @@ fn test_include_trim_whitespace() {
     );
 
     assert_eq!(events.next(), Some(SgmlEvent::Character("six".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("BAZ".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag { name: "BAZ".into() })
+    );
     assert_eq!(
         events.next(),
         Some(SgmlEvent::Attribute("PROP".into(), Some(" ]]> ".into())))
     );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("BAZ".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "BAZ".into() })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::Character("seven".into())));
     assert_eq!(
         events.next(),
@@ -69,8 +83,16 @@ fn test_include_trim_whitespace() {
         events.next(),
         Some(SgmlEvent::Character("]]>\n        end".into()))
     );
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("FOO".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "FOO".into() })
+    );
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), None);
 }
 
@@ -86,14 +108,22 @@ fn test_include_keep_whitespace() {
 
     assert_eq!(events.next(), Some(DOCTYPE));
 
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(
         events.next(),
         Some(SgmlEvent::Character("\n        one\n        ".into()))
     );
     assert_eq!(events.next(), Some(SgmlEvent::Character(" two ".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("FOO".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag { name: "FOO".into() })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(
         events.next(),
@@ -112,7 +142,10 @@ fn test_include_keep_whitespace() {
         Some(SgmlEvent::Character("\n            ".into()))
     );
     assert_eq!(events.next(), Some(SgmlEvent::Character(" six ".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("BAZ".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag { name: "BAZ".into() })
+    );
     assert_eq!(
         events.next(),
         Some(SgmlEvent::Attribute("PROP".into(), Some(" ]]> ".into())))
@@ -123,7 +156,10 @@ fn test_include_keep_whitespace() {
         events.next(),
         Some(SgmlEvent::Character("\n            ".into()))
     );
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("BAZ".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "BAZ".into() })
+    );
     assert_eq!(
         events.next(),
         Some(SgmlEvent::Character("\n        ".into()))
@@ -144,9 +180,17 @@ fn test_include_keep_whitespace() {
         events.next(),
         Some(SgmlEvent::Character(" ]]>\n        end\n        ".into()))
     );
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("FOO".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "FOO".into() })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::Character("\n    ".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::Character("\n".into())));
     assert_eq!(events.next(), None);
 }
@@ -162,10 +206,18 @@ fn test_ignore_trim_whitespace() {
 
     assert_eq!(events.next(), Some(DOCTYPE));
 
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(events.next(), Some(SgmlEvent::Character("one".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("BAZ".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "BAZ".into() })
+    );
     assert_eq!(
         events.next(),
         Some(SgmlEvent::Character("]]>\n        seven".into()))
@@ -178,8 +230,16 @@ fn test_ignore_trim_whitespace() {
         events.next(),
         Some(SgmlEvent::Character("]]>\n        end".into()))
     );
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("FOO".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "FOO".into() })
+    );
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), None);
 }
 
@@ -194,7 +254,12 @@ fn test_cdata_trim_whitespace() {
 
     assert_eq!(events.next(), Some(DOCTYPE));
 
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(events.next(), Some(SgmlEvent::Character("one".into())));
     assert_eq!(
@@ -211,13 +276,19 @@ fn test_cdata_trim_whitespace() {
     assert_eq!(events.next(), Some(SgmlEvent::Character("]]>".into())));
 
     assert_eq!(events.next(), Some(SgmlEvent::Character("six".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("BAZ".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag { name: "BAZ".into() })
+    );
     assert_eq!(
         events.next(),
         Some(SgmlEvent::Attribute("PROP".into(), Some(" ]]> ".into())))
     );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("BAZ".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "BAZ".into() })
+    );
     assert_eq!(
         events.next(),
         Some(SgmlEvent::Character("]]>\n        seven".into()))
@@ -230,8 +301,16 @@ fn test_cdata_trim_whitespace() {
         events.next(),
         Some(SgmlEvent::Character("]]>\n        end".into()))
     );
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("FOO".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "FOO".into() })
+    );
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), None);
 }
 
@@ -246,7 +325,12 @@ fn test_keep_unmodified_include_trim_whitespace() {
 
     assert_eq!(events.next(), Some(DOCTYPE));
 
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(events.next(), Some(SgmlEvent::Character("one".into())));
     assert_eq!(
@@ -283,8 +367,16 @@ fn test_keep_unmodified_include_trim_whitespace() {
         events.next(),
         Some(SgmlEvent::Character("]]>\n        end".into()))
     );
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("FOO".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "FOO".into() })
+    );
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), None);
 }
 
@@ -299,7 +391,12 @@ fn test_keep_unmodified_ignore_trim_whitespace() {
 
     assert_eq!(events.next(), Some(DOCTYPE));
 
-    assert_eq!(events.next(), Some(SgmlEvent::OpenStartTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::OpenStartTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), Some(SgmlEvent::CloseStartTag));
     assert_eq!(events.next(), Some(SgmlEvent::Character("one".into())));
     assert_eq!(
@@ -315,7 +412,10 @@ fn test_keep_unmodified_ignore_trim_whitespace() {
             .into()
         })
     );
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("BAZ".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "BAZ".into() })
+    );
     assert_eq!(
         events.next(),
         Some(SgmlEvent::Character("]]>\n        seven".into()))
@@ -338,7 +438,15 @@ fn test_keep_unmodified_ignore_trim_whitespace() {
         events.next(),
         Some(SgmlEvent::Character("]]>\n        end".into()))
     );
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("FOO".into())));
-    assert_eq!(events.next(), Some(SgmlEvent::EndTag("TEST".into())));
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag { name: "FOO".into() })
+    );
+    assert_eq!(
+        events.next(),
+        Some(SgmlEvent::EndTag {
+            name: "TEST".into()
+        })
+    );
     assert_eq!(events.next(), None);
 }

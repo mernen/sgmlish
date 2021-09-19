@@ -53,7 +53,7 @@ pub enum SgmlEvent<'a> {
     ///
     /// Empty start-elements (`<>`) are also represented by this event,
     /// with an empty slice.
-    OpenStartTag(Cow<'a, str>),
+    OpenStartTag { name: Cow<'a, str> },
     /// An attribute inside a start-element tag, e.g. `FOO="bar"`.
     Attribute(Cow<'a, str>, Option<Cow<'a, str>>),
     /// Closing of a start-element tag, e.g. `>`.
@@ -64,7 +64,7 @@ pub enum SgmlEvent<'a> {
     ///
     /// Empty end-element tags (`</>`) are also represented by this event,
     /// with an empty slice.
-    EndTag(Cow<'a, str>),
+    EndTag { name: Cow<'a, str> },
     /// Any string of characters that is not part of a tag.
     Character(Cow<'a, str>),
 }
@@ -84,13 +84,17 @@ impl<'a> SgmlEvent<'a> {
                 status_keywords: make_owned(status_keywords),
                 section: make_owned(section),
             },
-            SgmlEvent::OpenStartTag(name) => SgmlEvent::OpenStartTag(make_owned(name)),
+            SgmlEvent::OpenStartTag { name } => SgmlEvent::OpenStartTag {
+                name: make_owned(name),
+            },
             SgmlEvent::Attribute(key, value) => {
                 SgmlEvent::Attribute(make_owned(key), value.map(make_owned))
             }
             SgmlEvent::CloseStartTag => SgmlEvent::CloseStartTag,
             SgmlEvent::XmlCloseEmptyElement => SgmlEvent::XmlCloseEmptyElement,
-            SgmlEvent::EndTag(name) => SgmlEvent::EndTag(make_owned(name)),
+            SgmlEvent::EndTag { name } => SgmlEvent::EndTag {
+                name: make_owned(name),
+            },
             SgmlEvent::Character(text) => SgmlEvent::Character(make_owned(text)),
         }
     }
@@ -120,7 +124,7 @@ impl fmt::Display for SgmlEvent<'_> {
             } => {
                 write!(f, "<![{}[{}]]>", status_keywords, section)
             }
-            SgmlEvent::OpenStartTag(name) => write!(f, "<{}", name),
+            SgmlEvent::OpenStartTag { name } => write!(f, "<{}", name),
             SgmlEvent::Attribute(name, None) => f.write_str(name),
             SgmlEvent::Attribute(name, Some(value)) => {
                 f.write_str(name)?;
@@ -141,7 +145,7 @@ impl fmt::Display for SgmlEvent<'_> {
             }
             SgmlEvent::CloseStartTag => f.write_str(">"),
             SgmlEvent::XmlCloseEmptyElement => f.write_str("/>"),
-            SgmlEvent::EndTag(name) => write!(f, "</{}>", name),
+            SgmlEvent::EndTag { name } => write!(f, "</{}>", name),
             SgmlEvent::Character(value) => fmt::Display::fmt(&text::escape(value), f),
         }
     }
@@ -179,7 +183,7 @@ mod tests {
             "<?IS10744 FSIDR myurl>"
         );
 
-        assert_eq!(format!("{}", OpenStartTag("foo".into())), "<foo");
+        assert_eq!(format!("{}", OpenStartTag { name: "foo".into() }), "<foo");
         assert_eq!(
             format!("{}", Attribute("foo".into(), Some("bar".into()))),
             "foo=\"bar\""
@@ -187,8 +191,8 @@ mod tests {
         assert_eq!(format!("{}", Attribute("foo".into(), None)), "foo");
         assert_eq!(format!("{}", CloseStartTag), ">");
         assert_eq!(format!("{}", XmlCloseEmptyElement), "/>");
-        assert_eq!(format!("{}", EndTag("foo".into())), "</foo>");
-        assert_eq!(format!("{}", EndTag("".into())), "</>");
+        assert_eq!(format!("{}", EndTag { name: "foo".into() }), "</foo>");
+        assert_eq!(format!("{}", EndTag { name: "".into() }), "</>");
 
         assert_eq!(format!("{}", Character("hello".into())), "hello");
     }

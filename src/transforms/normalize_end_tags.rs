@@ -74,10 +74,10 @@ pub fn normalize_end_tags(mut fragment: SgmlFragment) -> Result<SgmlFragment, No
 
     for (i, event) in fragment.iter_mut().enumerate().rev() {
         match event {
-            SgmlEvent::OpenStartTag(name) | SgmlEvent::EndTag(name) if name.is_empty() => {
+            SgmlEvent::OpenStartTag { name } | SgmlEvent::EndTag { name } if name.is_empty() => {
                 return Err(NormalizationError::EmptyTagNotSupported);
             }
-            SgmlEvent::OpenStartTag(name) => {
+            SgmlEvent::OpenStartTag { name } => {
                 let insertion_point = end_xml_empty_element.take().or_else(|| match stack.last() {
                     Some(end_name) if *end_name == name => {
                         stack.pop();
@@ -86,7 +86,7 @@ pub fn normalize_end_tags(mut fragment: SgmlFragment) -> Result<SgmlFragment, No
                     _ => Some(next_insertion_point),
                 });
                 if let Some(insertion_point) = insertion_point {
-                    transform.insert_at(insertion_point, SgmlEvent::EndTag(name.clone()));
+                    transform.insert_at(insertion_point, SgmlEvent::EndTag { name: name.clone() });
                 }
                 next_insertion_point = i;
             }
@@ -94,7 +94,7 @@ pub fn normalize_end_tags(mut fragment: SgmlFragment) -> Result<SgmlFragment, No
                 *event = SgmlEvent::CloseStartTag;
                 end_xml_empty_element = Some(i + 1);
             }
-            SgmlEvent::EndTag(name) => {
+            SgmlEvent::EndTag { name } => {
                 stack.push(name);
                 next_insertion_point = i;
             }

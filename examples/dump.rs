@@ -86,17 +86,17 @@ fn reindent(fragment: SgmlFragment) -> SgmlFragment {
             continue;
         }
         match event {
-            SgmlEvent::OpenStartTag(_)
+            SgmlEvent::OpenStartTag { .. }
             | SgmlEvent::Character(_)
             | SgmlEvent::ProcessingInstruction(_)
             | SgmlEvent::MarkupDeclaration { .. }
             | SgmlEvent::MarkedSection { .. } => transform.insert_at(i, indent(indent_level)),
             SgmlEvent::CloseStartTag => match &fragment.as_slice()[i + 1..] {
-                [SgmlEvent::EndTag(_), ..] => keep_same_line = 1,
-                [SgmlEvent::Character(_), SgmlEvent::EndTag(_), ..] => keep_same_line = 2,
+                [SgmlEvent::EndTag { .. }, ..] => keep_same_line = 1,
+                [SgmlEvent::Character(_), SgmlEvent::EndTag { .. }, ..] => keep_same_line = 2,
                 _ => indent_level += 1,
             },
-            SgmlEvent::EndTag(_) => {
+            SgmlEvent::EndTag { .. } => {
                 indent_level -= 1;
                 transform.insert_at(i, indent(indent_level));
             }

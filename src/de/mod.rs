@@ -162,8 +162,8 @@ impl<'de> SgmlDeserializer<'de> {
             .iter()
             .skip(1)
             .find_map(|event| match event {
-                SgmlEvent::OpenStartTag(_) => Some(true),
-                SgmlEvent::EndTag(_) => Some(false),
+                SgmlEvent::OpenStartTag { .. } => Some(true),
+                SgmlEvent::EndTag { .. } => Some(false),
                 SgmlEvent::Character(text) if !text.is_empty() => {
                     contains_text = true;
                     None
@@ -191,7 +191,7 @@ impl<'de> SgmlDeserializer<'de> {
             SgmlEvent::MarkupDeclaration { .. }
             | SgmlEvent::ProcessingInstruction(_)
             | SgmlEvent::MarkedSection { .. } => {}
-            SgmlEvent::OpenStartTag(name) | SgmlEvent::EndTag(name) if name.is_empty() => {}
+            SgmlEvent::OpenStartTag { name } | SgmlEvent::EndTag { name } if name.is_empty() => {}
             _ => return Ok(()),
         }
         Err(DeserializationError::Unsupported(
@@ -201,7 +201,7 @@ impl<'de> SgmlDeserializer<'de> {
 
     fn expect_start_tag(&self) -> Result<&Cow<'de, str>, DeserializationError> {
         match self.peek() {
-            Ok(SgmlEvent::OpenStartTag(stag)) => Ok(stag),
+            Ok(SgmlEvent::OpenStartTag { name }) => Ok(name),
             _ => Err(DeserializationError::ExpectedStartTag),
         }
     }
@@ -209,7 +209,7 @@ impl<'de> SgmlDeserializer<'de> {
     /// Consumes the current event, asserting it is an open tag, and pushes it to the stack.
     fn push_elt(&mut self) -> Result<&str, DeserializationError> {
         let stag = match self.events.next() {
-            Some(SgmlEvent::OpenStartTag(name)) => name,
+            Some(SgmlEvent::OpenStartTag { name }) => name,
             _ => return Err(DeserializationError::ExpectedStartTag),
         };
         debug!("push({}): {:?}", self.stack.len(), stag);
@@ -236,7 +236,7 @@ impl<'de> SgmlDeserializer<'de> {
                     self.stack.pop();
                     return Ok(());
                 }
-                SgmlEvent::EndTag(name) => {
+                SgmlEvent::EndTag { name } => {
                     self.check_stack_size(stack_size);
                     let expected = self.stack.pop().unwrap();
                     if name != expected {
@@ -248,7 +248,7 @@ impl<'de> SgmlDeserializer<'de> {
                     debug!("popped({}): {:?}", stack_size, name);
                     return Ok(());
                 }
-                SgmlEvent::OpenStartTag(name) => {
+                SgmlEvent::OpenStartTag { name } => {
                     self.stack.push(name);
                     self.pop_elt()?;
                 }
@@ -293,10 +293,10 @@ impl<'de> SgmlDeserializer<'de> {
 
         loop {
             match self.peek_mut()? {
-                SgmlEvent::OpenStartTag(_) => {
+                SgmlEvent::OpenStartTag { .. } => {
                     self.push_elt()?;
                 }
-                SgmlEvent::EndTag(_) => {
+                SgmlEvent::EndTag { .. } => {
                     self.pop_elt()?;
                     if self.stack.len() == starting_stack_size {
                         break;
@@ -475,7 +475,7 @@ impl<'de, 'r> Deserializer<'de> for &'r mut SgmlDeserializer<'de> {
 
         trace!("deserialize_unit");
         match self.peek()? {
-            SgmlEvent::OpenStartTag(_) => {
+            SgmlEvent::OpenStartTag { .. } => {
                 self.push_elt()?;
                 self.pop_elt()?;
                 visitor.visit_unit()
@@ -635,7 +635,7 @@ impl<'de, 'r> Deserializer<'de> for &'r mut SgmlDeserializer<'de> {
             return self.deserialize_str(visitor);
         }
         match self.peek()? {
-            SgmlEvent::OpenStartTag(..) => {
+            SgmlEvent::OpenStartTag { .. } => {
                 let content = self.peek_content_type()?;
                 if content.contains_child_elements {
                     self.deserialize_map(visitor)
@@ -723,7 +723,7 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
 
         loop {
             break match self.de.peek_mut()? {
-                SgmlEvent::EndTag(_) | SgmlEvent::XmlCloseEmptyElement => {
+                SgmlEvent::EndTag { .. } | SgmlEvent::XmlCloseEmptyElement => {
                     if self.text_content.is_some() {
                         self.next_entry_is_dollarvalue = true;
                         debug!("next key: $value");
@@ -741,15 +741,15 @@ impl<'de, 'r> de::MapAccess<'de> for MapAccess<'de, 'r> {
                     self.de.advance()?;
                     continue;
                 }
-                SgmlEvent::OpenStartTag(tag_name) => match self.content_strategy {
+                SgmlEvent::OpenStartTag { name } => match self.content_strategy {
                     ContentStrategy::ElementsAreMapEntries => {
-                        debug!("next key: {} (from tag name)", tag_name);
-                        self.map_key = Some(tag_name.clone().into_owned().into());
-                        seed.deserialize(tag_name.as_ref().into_deserializer())
+                        debug!("next key: {} (from tag name)", name);
+                        self.map_key = Some(name.clone().into_owned().into());
+                        seed.deserialize(name.as_ref().into_deserializer())
                             .map(Some)
                     }
                     ContentStrategy::ElementsAreDollarValue => {
-                        debug!("next key: $value (for element {:?})", tag_name);
+                        debug!("next key: $value (for element {:?})", name);
                         seed.deserialize("$value".into_deserializer()).map(Some)
                     }
                     ContentStrategy::TextOnly => unreachable!(),
@@ -820,8 +820,8 @@ impl<'de, 'r> de::SeqAccess<'de> for SeqAccess<'de, 'r> {
 
         loop {
             match self.de.peek()? {
-                SgmlEvent::OpenStartTag(tag_name) => match &self.tag_name {
-                    Some(expected_tag) if tag_name.as_ref() != expected_tag.as_ref() => {
+                SgmlEvent::OpenStartTag { name } => match &self.tag_name {
+                    Some(expected_tag) if name.as_ref() != expected_tag.as_ref() => {
                         return Ok(None)
                     }
                     _ => {
