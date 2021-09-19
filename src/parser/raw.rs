@@ -109,7 +109,7 @@ where
 /// immediately after [`marked_section_start_and_keywords`].
 ///
 /// These sections do nest, meaning they end on the first `]]>` found.
-pub fn marked_section_body_character<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
+pub fn marked_section_body_character_data<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
@@ -126,7 +126,7 @@ where
     E: ParseError<&'a str> + ContextError<&'a str>,
 {
     use nom::{FindSubstring, Slice};
-    let (close_suffix, close_match) = marked_section_body_character(input)?;
+    let (close_suffix, close_match) = marked_section_body_character_data(input)?;
     match close_match.find_substring(MARKED_SECTION_START) {
         Some(n) => {
             let (suffix_after_matched_pair, _) =
@@ -451,17 +451,20 @@ mod tests {
 
     #[test]
     fn test_marked_section_body_character() {
-        assert_eq!(marked_section_body_character::<E>("]]>"), Ok(("", "")));
-        assert_eq!(marked_section_body_character::<E>(" ]]>"), Ok(("", " ")));
+        assert_eq!(marked_section_body_character_data::<E>("]]>"), Ok(("", "")));
         assert_eq!(
-            marked_section_body_character::<E>("hello<![CDATA[world]]>]]>"),
+            marked_section_body_character_data::<E>(" ]]>"),
+            Ok(("", " "))
+        );
+        assert_eq!(
+            marked_section_body_character_data::<E>("hello<![CDATA[world]]>]]>"),
             Ok(("]]>", "hello<![CDATA[world")),
         );
-        marked_section_body_character::<E>("").unwrap_err();
-        marked_section_body_character::<E>(" ").unwrap_err();
-        marked_section_body_character::<E>("]]").unwrap_err();
-        marked_section_body_character::<E>("]] >").unwrap_err();
-        marked_section_body_character::<E>("] ]>").unwrap_err();
+        marked_section_body_character_data::<E>("").unwrap_err();
+        marked_section_body_character_data::<E>(" ").unwrap_err();
+        marked_section_body_character_data::<E>("]]").unwrap_err();
+        marked_section_body_character_data::<E>("]] >").unwrap_err();
+        marked_section_body_character_data::<E>("] ]>").unwrap_err();
     }
 
     #[test]

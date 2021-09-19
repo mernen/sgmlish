@@ -134,8 +134,8 @@ where
         MarkedSectionHandling::KeepUnmodified => {
             let (rest, content) = match status {
                 MarkedSectionStatus::Ignore => raw::marked_section_body_ignore(input),
-                MarkedSectionStatus::CData => raw::marked_section_body_character(input),
-                MarkedSectionStatus::RcData => raw::marked_section_body_character(input),
+                MarkedSectionStatus::CData => raw::marked_section_body_character_data(input),
+                MarkedSectionStatus::RcData => raw::marked_section_body_character_data(input),
                 MarkedSectionStatus::Include => terminated(
                     recognize(|input| {
                         content(input, config, MarkedSectionEndHandling::StopParsing)
@@ -155,11 +155,11 @@ where
             MarkedSectionStatus::Ignore => {
                 map(raw::marked_section_body_ignore, |_| EventIter::empty())(input)
             }
-            MarkedSectionStatus::CData => map(raw::marked_section_body_character, |content| {
+            MarkedSectionStatus::CData => map(raw::marked_section_body_character_data, |content| {
                 EventIter::once(SgmlEvent::Character(config.trim(content).into()))
             })(input),
             MarkedSectionStatus::RcData => {
-                let (rest, content) = raw::marked_section_body_character(input)?;
+                let (rest, content) = raw::marked_section_body_character_data(input)?;
                 Ok((
                     rest,
                     EventIter::once(SgmlEvent::Character(
