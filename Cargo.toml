@@ -1,6 +1,6 @@
 [package]
 name = "sgmlish"
-version = "0.1.0"
+version = "0.2.0"
 description = "Simple parsing and deserialization of SGML"
 license = "MIT"
 repository = "https://github.com/mernen/sgmlish"
