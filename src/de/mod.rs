@@ -251,7 +251,7 @@ impl<'de> SgmlDeserializer<'de> {
                             found: name.to_string(),
                         });
                     }
-                    debug!("popped({}): {:?}", stack_size, name);
+                    debug!("popped({}): {:?}", stack_size - 1, name);
                     return Ok(());
                 }
                 SgmlEvent::OpenStartTag { name } => {
