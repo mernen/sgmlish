@@ -181,10 +181,9 @@ let example = sgmlish::from_fragment::<Example>(sgml)?;
   }
 
   #[derive(Deserialize)]
+  #[serde(rename_all = "lowercase")]
   enum Operation {
-    #[serde(rename = "credit")]
     Credit,
-    #[serde(rename = "debit")]
     Debit,
   }
   ```

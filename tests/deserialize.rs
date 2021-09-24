@@ -46,10 +46,9 @@ fn test_struct_dollarvalue() {
     init_logger();
 
     #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(rename_all = "UPPERCASE")]
     struct Test {
-        #[serde(rename = "HREF")]
         href: String,
-        #[serde(rename = "TARGET")]
         target: Option<String>,
         #[serde(rename = "$value")]
         text: String,
@@ -71,10 +70,9 @@ fn test_element_data() {
     init_logger();
 
     #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(rename_all = "UPPERCASE")]
     struct Item {
-        #[serde(rename = "NAME")]
         name: String,
-        #[serde(rename = "SOURCE")]
         source: String,
     }
 
@@ -101,38 +99,31 @@ fn test_ofx() -> sgmlish::Result<()> {
     init_logger();
 
     #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(rename_all = "UPPERCASE")]
     struct BankTransactionList {
-        #[serde(rename = "DTSTART")]
         dtstart: String,
-        #[serde(rename = "DTEND")]
         dtend: String,
         #[serde(rename = "STMTTRN")]
         transactions: Vec<StatementTransaction>,
     }
 
     #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(rename_all = "UPPERCASE")]
     struct StatementTransaction {
-        #[serde(rename = "TRNTYPE")]
         trntype: TransactionType,
-        #[serde(rename = "DTPOSTED")]
         dtposted: String,
         #[serde(rename = "TRNAMT")]
         amount: Decimal,
-        #[serde(rename = "FITID")]
         fitid: String,
-        #[serde(rename = "MEMO")]
         memo: Option<String>,
-        #[serde(rename = "CURRENCY")]
         currency: Option<Currency>,
     }
 
     #[derive(Debug, Deserialize, Eq, PartialEq)]
+    #[serde(rename_all = "UPPERCASE")]
     enum TransactionType {
-        #[serde(rename = "CREDIT")]
         Credit,
-        #[serde(rename = "DEBIT")]
         Debit,
-        #[serde(rename = "PAYMENT")]
         Payment,
         #[serde(rename = "XFER")]
         Transfer,
