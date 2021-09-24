@@ -517,6 +517,8 @@ fn test_enum_internal_tag() {
     #[serde(rename_all = "kebab-case")]
     pub enum Background {
         Color {
+            // Internal tagging does not work with newtype variants containing
+            // primitive values or strings, so we must use a struct variant
             #[serde(rename = "$value")]
             value: String,
         },
