@@ -475,3 +475,38 @@ fn test_reject_processing_instructions() {
         DeserializationError::Unsupported(SgmlEvent::ProcessingInstruction(pi)) if pi == "<?experiment>"
     ));
 }
+
+#[test]
+fn test_recursive_enum() {
+    init_logger();
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(rename_all = "lowercase")]
+    pub enum Node {
+        Leaf(i64),
+        Branch(Box<(Node, Node)>),
+    }
+
+    let input = r##"
+        <branch>
+            <leaf>10</leaf>
+            <branch>
+                <branch>
+                    <leaf>20</leaf>
+                    <leaf>30</leaf>
+                </branch>
+                <leaf>40</leaf>
+            </branch>
+        </branch>
+    "##;
+    let sgml = sgmlish::parse(input).unwrap();
+    let out = sgml.deserialize::<Node>().unwrap();
+    let expected = Node::Branch(Box::new((
+        Node::Leaf(10),
+        Node::Branch(Box::new((
+            Node::Branch(Box::new((Node::Leaf(20), Node::Leaf(30)))),
+            Node::Leaf(40),
+        ))),
+    )));
+    assert_eq!(out, expected);
+}

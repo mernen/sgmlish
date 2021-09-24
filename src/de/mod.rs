@@ -1,6 +1,6 @@
 //! Deserialize SGML data to a Rust data structure.
 
-use std::borrow::Cow;
+use std::borrow::{BorrowMut, Cow};
 use std::rc::Rc;
 use std::{fmt, mem};
 
@@ -891,7 +891,19 @@ impl<'de, 'r> de::VariantAccess<'de> for EnumAccess<'de, 'r> {
         seed: T,
     ) -> Result<T::Value, Self::Error> {
         trace!("newtype_variant");
-        seed.deserialize(self.de)
+        // If we just used the current tag name as a variant, we need to push the tag into the stack,
+        // or else we might get stuck in a loop
+        let push =
+            self.use_tag_name_for_variant && self.de.peek_content_type()?.contains_child_elements;
+        if push {
+            self.de.push_elt()?;
+            self.de.advance_to_content()?;
+        }
+        let value = seed.deserialize(self.de.borrow_mut())?;
+        if push {
+            self.de.pop_elt()?;
+        }
+        Ok(value)
     }
 
     fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
