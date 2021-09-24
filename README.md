@@ -170,6 +170,72 @@ let example = sgmlish::from_fragment::<Example>(sgml)?;
   }
   ```
 
+* Enums: for [externally tagged enums][], fieldless enums (that is, enums where
+  none of the variants have any data) can be read either as strings
+  (from element text or an attribute value) or from tag names:
+
+  ```rust
+  #[derive(Deserialize)]
+  struct Transaction {
+    operation: Operation,
+  }
+
+  #[derive(Deserialize)]
+  enum Operation {
+    #[serde(rename = "credit")]
+    Credit,
+    #[serde(rename = "debit")]
+    Debit,
+  }
+  ```
+
+  ```xml
+  <!-- these are all equivalent -->
+  <transaction operation="credit"></transaction>
+  <transaction><operation>credit</operation></transaction>
+  <transaction><operation><credit></credit></operation></transaction>
+  ```
+
+  Enums with fields must always use the element form:
+
+  ```rust
+  #[derive(Deserialize)]
+  struct Example {
+    background: Background,
+  }
+
+  #[derive(Deserialize)]
+  #[serde(rename_all = "lowercase")]
+  enum Value {
+    Color(String),
+    Gradient { from: String, to: String },
+  }
+  ```
+
+  ```xml
+  <!-- Examples of valid uses: -->
+  <example>
+    <background>
+      <color>red</color>
+    </background>
+  </example>
+
+  <example>
+    <background>
+      <gradient from="blue" to="navy"></gradient>
+    </background>
+  </example>
+
+  <example>
+    <background>
+      <gradient>
+        <from>black</from>
+        <to>gold</to>
+      </gradient>
+    </background>
+  </example>
+  ```
+
 
 ## Crate features
 
@@ -179,6 +245,7 @@ let example = sgmlish::from_fragment::<Example>(sgml)?;
   To disable it, set `default-features = false` in your `Cargo.toml` file.
 
 
+[externally tagged enums]: https://serde.rs/enum-representations.html
 [HTML5 spec]: https://html.spec.whatwg.org/multipage/parsing.html#parsing
 [html5ever]: https://lib.rs/crates/html5ever
 [OFX]: https://en.wikipedia.org/wiki/Open_Financial_Exchange
