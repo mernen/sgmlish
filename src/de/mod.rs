@@ -155,6 +155,7 @@ impl<'de> SgmlDeserializer<'de> {
     }
 
     fn peek_content_type(&self) -> Result<PeekContentType, DeserializationError> {
+        let mut contains_attributes = false;
         let mut contains_text = false;
         let contains_child_elements = self
             .events
@@ -164,6 +165,10 @@ impl<'de> SgmlDeserializer<'de> {
             .find_map(|event| match event {
                 SgmlEvent::OpenStartTag { .. } => Some(true),
                 SgmlEvent::EndTag { .. } => Some(false),
+                SgmlEvent::Attribute { .. } => {
+                    contains_attributes = true;
+                    None
+                }
                 SgmlEvent::Character(text) if !text.is_empty() => {
                     contains_text = true;
                     None
@@ -173,6 +178,7 @@ impl<'de> SgmlDeserializer<'de> {
             .ok_or(DeserializationError::UnexpectedEof)?;
 
         let content = PeekContentType {
+            contains_attributes,
             contains_child_elements,
             contains_text,
         };
@@ -637,8 +643,8 @@ impl<'de, 'r> Deserializer<'de> for &'r mut SgmlDeserializer<'de> {
         match self.peek()? {
             SgmlEvent::OpenStartTag { .. } => {
                 let content = self.peek_content_type()?;
-                if content.contains_child_elements {
-                    self.deserialize_map(visitor)
+                if content.contains_child_elements || content.contains_attributes {
+                    self.do_map(visitor, !content.contains_child_elements)
                 } else if content.contains_text {
                     self.deserialize_str(visitor)
                 } else {
@@ -932,6 +938,7 @@ impl<'de, 'r> de::VariantAccess<'de> for EnumAccess<'de, 'r> {
 
 #[derive(Debug)]
 struct PeekContentType {
+    contains_attributes: bool,
     contains_text: bool,
     contains_child_elements: bool,
 }

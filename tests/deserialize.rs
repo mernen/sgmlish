@@ -501,3 +501,109 @@ fn test_recursive_enum() {
     )));
     assert_eq!(out, expected);
 }
+
+#[test]
+fn test_enum_internal_tag() {
+    init_logger();
+
+    #[derive(Debug, Deserialize)]
+    pub struct Example {
+        #[serde(rename = "background")]
+        backgrounds: Vec<Background>,
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(tag = "type")]
+    #[serde(rename_all = "kebab-case")]
+    pub enum Background {
+        Color {
+            #[serde(rename = "$value")]
+            value: String,
+        },
+        Gradient {
+            from: String,
+            to: String,
+        },
+    }
+
+    let input = r##"
+        <example>
+            <background type="color">red</background>
+            <background type="gradient" from="blue" to="navy"></background>
+            <background type="gradient">
+                <from>black</from>
+                <to>gold</to>
+            </background>
+        </example>
+    "##;
+    let sgml = sgmlish::parse(input).unwrap();
+    let example = sgml.deserialize::<Example>().unwrap();
+    assert_eq!(example.backgrounds.len(), 3);
+    assert_eq!(
+        example.backgrounds[0],
+        Background::Color {
+            value: "red".into()
+        }
+    );
+    assert_eq!(
+        example.backgrounds[1],
+        Background::Gradient {
+            from: "blue".into(),
+            to: "navy".into()
+        }
+    );
+    assert_eq!(
+        example.backgrounds[2],
+        Background::Gradient {
+            from: "black".into(),
+            to: "gold".into()
+        }
+    );
+}
+
+#[test]
+fn test_enum_untagged() {
+    init_logger();
+
+    #[derive(Debug, Deserialize)]
+    pub struct Example {
+        #[serde(rename = "background")]
+        backgrounds: Vec<Background>,
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(untagged)]
+    pub enum Background {
+        Color(String),
+        Gradient { from: String, to: String },
+    }
+
+    let input = r##"
+        <example>
+            <background>red</background>
+            <background from="blue" to="navy"></background>
+            <background>
+                <from>black</from>
+                <to>gold</to>
+            </background>
+        </example>
+    "##;
+    let sgml = sgmlish::parse(input).unwrap();
+    let example = sgml.deserialize::<Example>().unwrap();
+    assert_eq!(example.backgrounds.len(), 3);
+    assert_eq!(example.backgrounds[0], Background::Color("red".into()));
+    assert_eq!(
+        example.backgrounds[1],
+        Background::Gradient {
+            from: "blue".into(),
+            to: "navy".into()
+        }
+    );
+    assert_eq!(
+        example.backgrounds[2],
+        Background::Gradient {
+            from: "black".into(),
+            to: "gold".into()
+        }
+    );
+}
