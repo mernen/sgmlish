@@ -7,6 +7,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// An error occurred when parsing SGML data.
+    ///
+    /// Parsing errors are at this point simplified, so that this error type
+    /// has no dependencies on transient state.
+    /// If you wish to capture more details from the parser, see
+    /// [`Parser::parse_with_detailed_errors`](crate::parser::Parser::parse_with_detailed_errors).
     #[error("{0}")]
     ParseError(String),
     /// An error occurred when deseralizing.
@@ -22,4 +27,17 @@ pub enum Error {
     /// An error ocurred when processing a marked section.
     #[error("invalid marked section keyword: {0}")]
     InvalidMarkedSectionKeyword(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    /// Ensure all the necessary bounds are met for downcasting errors
+    fn test_error_downcast() {
+        let err: Box<dyn std::error::Error + Send + Sync> =
+            Box::new(Error::ParseError("".to_owned()));
+        assert!(err.downcast::<Error>().is_ok());
+    }
 }
