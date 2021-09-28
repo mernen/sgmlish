@@ -34,10 +34,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_error_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<Error>();
+    }
+
+    #[test]
     /// Ensure all the necessary bounds are met for downcasting errors
-    fn test_error_downcast() {
-        let err: Box<dyn std::error::Error + Send + Sync> =
-            Box::new(Error::ParseError("".to_owned()));
-        assert!(err.downcast::<Error>().is_ok());
+    fn test_error_dyn_cast() {
+        let err: Box<dyn std::error::Error> = Box::new(Error::ParseError("".to_owned()));
+        assert!(err.is::<Error>());
     }
 }
