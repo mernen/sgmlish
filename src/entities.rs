@@ -19,7 +19,7 @@ pub type Result<T = ()> = std::result::Result<T, EntityError>;
 /// The error type in the event an invalid entity or character reference is found.
 ///
 /// That means the entity expansion closure was called, and it returned `None`.
-/// When invoking [`expand_character_references`], any entity reference is considered undefined.
+/// When invoking [`expand_characters`], any entity reference is considered undefined.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 #[error("entity '{entity}' is not defined")]
 pub struct EntityError {
@@ -35,11 +35,11 @@ pub struct EntityError {
 /// # Example
 ///
 /// ```rust
-/// # use sgmlish::entities::expand_character_references;
-/// let expanded = expand_character_references("&#60;hello&#44; world&#33;&#62;");
+/// # use sgmlish::entities::expand_characters;
+/// let expanded = expand_characters("&#60;hello&#44; world&#33;&#62;");
 /// assert_eq!(expanded, Ok("<hello, world!>".into()));
 /// ```
-pub fn expand_character_references(text: &str) -> Result<Cow<str>> {
+pub fn expand_characters(text: &str) -> Result<Cow<str>> {
     expand_entities(text, |_| None::<&str>)
 }
 
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn test_invalid_refs() {
         fn assert_noop(s: &str) {
-            let result = expand_character_references(s);
+            let result = expand_characters(s);
             assert_eq!(result, Ok(s.into()));
         }
 
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn test_invalid_character_ref() {
-        let result = expand_character_references("foo&#x110000;bar");
+        let result = expand_characters("foo&#x110000;bar");
         assert_eq!(
             result,
             Err(EntityError {
@@ -218,20 +218,20 @@ mod tests {
     }
 
     #[test]
-    fn test_expand_character_references() {
-        let result = expand_character_references("f&#111o bar &#128523;");
+    fn test_expand_characters() {
+        let result = expand_characters("f&#111o bar &#128523;");
         assert_eq!(result, Ok("foo bar \u{1f60b}".into()));
     }
 
     #[test]
-    fn test_expand_character_references_hex() {
-        let result = expand_character_references("fo&#x6f; bar &#xFeFf;");
+    fn test_expand_characters_hex() {
+        let result = expand_characters("fo&#x6f; bar &#xFeFf;");
         assert_eq!(result, Ok("foo bar \u{feff}".into()));
     }
 
     #[test]
-    fn test_expand_character_references_missing_semicolon() {
-        let result = expand_character_references("fo&#x6f bar &#xFeFf");
+    fn test_expand_characters_missing_semicolon() {
+        let result = expand_characters("fo&#x6f bar &#xFeFf");
         assert_eq!(result, Ok("foo bar \u{feff}".into()));
     }
 
