@@ -43,7 +43,7 @@ pub fn expand_character_references(text: &str) -> Result<Cow<str>> {
     expand_entities(text, |_| None::<&str>)
 }
 
-/// Expands entities (`&foo;`) in the text using the given closure as lookup.
+/// Expands entity references (`&foo;`) in the text using the given closure as lookup.
 ///
 /// Character references (`&#123;`) are also expanded, without going through the closure.
 /// Function names (`&#SPACE;`) as well as invalid character references
@@ -94,7 +94,7 @@ where
     F: FnMut(&str) -> Option<T>,
     T: AsRef<str>,
 {
-    expand_entities_with(text, "%", entity, f)
+    expand_entities_with(text, "%", entity_ref, f)
 }
 
 fn expand_entities_with<'a, M, F, T>(
@@ -149,7 +149,7 @@ where
 }
 
 fn entity_or_char_ref(input: &str) -> IResult<&str, EntityRef> {
-    alt((char_ref, entity))(input)
+    alt((char_ref, entity_ref))(input)
 }
 
 fn char_ref(input: &str) -> IResult<&str, EntityRef> {
@@ -158,7 +158,7 @@ fn char_ref(input: &str) -> IResult<&str, EntityRef> {
             tag("#"),
             alt((
                 map(digit1, |code: &str| code.parse().ok()),
-                // Hex escape codes are actually only valid in XML
+                // Hex escape codes are actually only valid in XML, but welp
                 preceded(
                     tag("x"),
                     map(take_while1(is_name_char), |code| {
@@ -175,7 +175,7 @@ fn char_ref(input: &str) -> IResult<&str, EntityRef> {
     )(input)
 }
 
-fn entity(input: &str) -> IResult<&str, EntityRef> {
+fn entity_ref(input: &str) -> IResult<&str, EntityRef> {
     map(recognize(preceded(opt(tag("#")), name)), EntityRef::Entity)(input)
 }
 
