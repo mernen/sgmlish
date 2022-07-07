@@ -36,7 +36,7 @@ jobs:
 
     strategy:
       matrix:
-        toolchain: [stable, nightly, '1.53']
+        toolchain: [stable, nightly, '1.57']
         features:
           - ''
           - '--no-default-features'
