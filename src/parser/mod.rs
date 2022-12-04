@@ -283,7 +283,7 @@ impl ParserBuilder {
         self.name_normalization(NameNormalization::ToLowercase)
     }
 
-    /// Normalizes all tag and attribute names to lowercase.
+    /// Normalizes all tag and attribute names to uppercase.
     pub fn uppercase_names(self) -> Self {
         self.name_normalization(NameNormalization::ToUppercase)
     }
