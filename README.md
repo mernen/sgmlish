@@ -205,7 +205,7 @@ let example = sgmlish::from_fragment::<Example>(sgml)?;
 
   #[derive(Deserialize)]
   #[serde(rename_all = "lowercase")]
-  enum Value {
+  enum Background {
     Color(String),
     Gradient { from: String, to: String },
   }
