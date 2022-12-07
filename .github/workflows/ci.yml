@@ -36,7 +36,7 @@ jobs:
 
     strategy:
       matrix:
-        toolchain: [stable, nightly, '1.57']
+        toolchain: [stable, nightly, '1.60']
         cargo-update-flags: ['']
         features:
           - ''
