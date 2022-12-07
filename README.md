@@ -76,7 +76,7 @@ let input = r##"
     </CRATE>
 "##;
 // Step 1: configure parser, then parse string
-let sgml = sgmlish::Parser::build()
+let sgml = sgmlish::Parser::builder()
     .lowercase_names()
     .parse(input)?;
 // Step 2: normalization/validation
