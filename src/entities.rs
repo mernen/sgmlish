@@ -20,7 +20,7 @@ pub type Result<T = ()> = std::result::Result<T, EntityError>;
 ///
 /// That means the entity expansion closure was called, and it returned `None`.
 /// When invoking [`expand_characters`], any entity reference is considered undefined.
-#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("entity '{entity}' is not defined")]
 pub struct EntityError {
     /// The name of the entity that was not found.

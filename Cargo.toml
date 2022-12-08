@@ -8,6 +8,7 @@ authors = ["Daniel Luz <dev.gsz@mernen.com>"]
 categories = ["parser-implementations"]
 keywords = ["sgml", "serde"]
 edition = "2018"
+rust-version = "1.60"
 
 exclude = [
     ".github/*",

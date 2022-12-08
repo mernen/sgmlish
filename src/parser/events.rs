@@ -351,7 +351,7 @@ where
 ///
 /// This struct exists to minimize the number of allocations during the
 /// parsing phase.
-#[derive(PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct EventIter<'a> {
     start: Option<SgmlEvent<'a>>,
     middle: Vec<SgmlEvent<'a>>,

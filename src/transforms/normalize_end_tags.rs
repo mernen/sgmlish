@@ -4,7 +4,7 @@ use crate::{text, SgmlEvent, SgmlFragment};
 /// The error type in the event tag normalization fails.
 ///
 /// This is returned by [`normalize_end_tags`].
-#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum NormalizationError {
     #[error("unpaired end tag: </{0}>")]
     UnpairedEndTag(String),
