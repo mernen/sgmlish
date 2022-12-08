@@ -8,28 +8,21 @@ jobs:
 
     steps:
       - name: Install Rust (stable)
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          default: true
           components: clippy, rustfmt
 
       - uses: actions/checkout@v3
 
-      - uses: Swatinem/rust-cache@v1
-
       - name: Check formatting
         run: cargo fmt -- --check
 
-      - uses: actions-rs/clippy-check@v1
+      - uses: 10XGenomics/clippy-check@39a72b450310c63d1ee747a1f6039580eb7f6153
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
 
-      - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
+      - run: cargo check
 
   test:
     runs-on: ubuntu-latest
@@ -51,25 +44,16 @@ jobs:
 
     steps:
       - name: Install Rust (${{ matrix.toolchain }})
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.toolchain }}
-          default: true
           components: clippy, rustfmt
 
       - uses: actions/checkout@v3
 
-      - uses: Swatinem/rust-cache@v1
-
       - name: Adjust dependencies ${{ matrix.cargo-update-flags }}
         if: matrix.cargo-update-flags
-        uses: actions-rs/cargo@v1
-        with:
-          command: update
-          args: ${{ matrix.cargo-update-flags }}
+        run: cargo update ${{ matrix.cargo-update-flags }}
 
       - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: ${{ matrix.features }}
+        run: cargo test ${{ matrix.features }}
