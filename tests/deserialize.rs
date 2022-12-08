@@ -1,4 +1,6 @@
 #![cfg(feature = "serde")]
+// Allow unreferenced fields since we're just testing deserialization
+#![allow(dead_code)]
 
 use std::str::FromStr;
 
